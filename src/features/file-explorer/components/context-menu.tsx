@@ -8,6 +8,7 @@ import {
   FolderPlus,
   Pencil,
   Trash2,
+  Archive,
 } from "lucide-react"
 import { useFileExplorer } from "../state/explorer-context"
 
@@ -69,6 +70,7 @@ export function FileContextMenu() {
     startNewFile,
     selectedPaths,
     entries,
+    compress,
   } = useFileExplorer()
 
   if (!contextMenu) return null
@@ -134,6 +136,15 @@ export function FileContextMenu() {
               shortcut="F2"
               onClick={() => {
                 startRename(entry)
+                closeContextMenu()
+              }}
+            />
+            <MenuDivider />
+            <MenuItem
+              icon={<Archive className="h-3.5 w-3.5" />}
+              label="Comprimir (.tar.zst)"
+              onClick={() => {
+                compress(targetPaths)
                 closeContextMenu()
               }}
             />

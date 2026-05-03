@@ -26,10 +26,29 @@ pub struct DirectoryPage {
     pub limit: usize,
 }
 
+#[derive(Deserialize, Clone, Copy)]
+#[serde(rename_all = "lowercase")]
+pub enum SortBy {
+    Name,
+    Size,
+    Modified,
+}
+
+#[derive(Deserialize, Clone, Copy)]
+#[serde(rename_all = "lowercase")]
+pub enum SortDir {
+    Asc,
+    Desc,
+}
+
 #[derive(Deserialize)]
 pub struct ListOptions {
     pub limit: Option<usize>,
     pub offset: Option<usize>,
+    #[serde(rename = "sortBy")]
+    pub sort_by: Option<SortBy>,
+    #[serde(rename = "sortDir")]
+    pub sort_dir: Option<SortDir>,
 }
 
 #[tauri::command]
@@ -39,6 +58,8 @@ pub fn list_directory(
 ) -> Result<DirectoryPage, String> {
     let limit = options.as_ref().and_then(|o| o.limit).unwrap_or(DEFAULT_PAGE_SIZE);
     let offset = options.as_ref().and_then(|o| o.offset).unwrap_or(0);
+    let sort_by = options.as_ref().and_then(|o| o.sort_by).unwrap_or(SortBy::Name);
+    let sort_dir = options.as_ref().and_then(|o| o.sort_dir).unwrap_or(SortDir::Asc);
 
     let dir = Path::new(&path);
 
@@ -77,10 +98,23 @@ pub fn list_directory(
         })
         .collect();
 
-    all.sort_by(|a, b| match (a.is_dir, b.is_dir) {
-        (true, false) => std::cmp::Ordering::Less,
-        (false, true) => std::cmp::Ordering::Greater,
-        _ => a.name.to_lowercase().cmp(&b.name.to_lowercase()),
+    all.sort_by(|a, b| {
+        match (a.is_dir, b.is_dir) {
+            (true, false) => std::cmp::Ordering::Less,
+            (false, true) => std::cmp::Ordering::Greater,
+            _ => {
+                let primary = match sort_by {
+                    SortBy::Name => a.name.to_lowercase().cmp(&b.name.to_lowercase()),
+                    SortBy::Size => a.size.cmp(&b.size),
+                    SortBy::Modified => a.modified.cmp(&b.modified),
+                };
+                let primary = match sort_dir {
+                    SortDir::Asc => primary,
+                    SortDir::Desc => primary.reverse(),
+                };
+                primary.then_with(|| a.name.to_lowercase().cmp(&b.name.to_lowercase()))
+            }
+        }
     });
 
     let total = all.len();
@@ -168,14 +202,18 @@ pub fn rename_and_list(
 pub fn delete_entry(path: String) -> Result<(), String> {
     let p = Path::new(&path);
     reject_traversal(p)?;
-    let meta = std::fs::symlink_metadata(p).map_err(|e| e.to_string())?;
-    if meta.file_type().is_symlink() {
-        std::fs::remove_file(p).map_err(|e| e.to_string())
-    } else if meta.is_dir() {
-        std::fs::remove_dir_all(p).map_err(|e| e.to_string())
-    } else {
-        std::fs::remove_file(p).map_err(|e| e.to_string())
+    std::fs::symlink_metadata(p).map_err(|e| e.to_string())?;
+    trash::delete(p).map_err(|e| format!("Trash: {}", e))
+}
+
+#[tauri::command]
+pub fn delete_entries(paths: Vec<String>) -> Result<(), String> {
+    for path in &paths {
+        let p = Path::new(path);
+        reject_traversal(p)?;
+        std::fs::symlink_metadata(p).map_err(|e| e.to_string())?;
     }
+    trash::delete_all(&paths).map_err(|e| format!("Trash: {}", e))
 }
 
 #[tauri::command]

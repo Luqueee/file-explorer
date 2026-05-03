@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react"
-import { fsGateway } from "@/features/filesystem/infra/fs.gateway"
+import { fsGateway, type GrepHit } from "@/features/filesystem/infra/fs.gateway"
 import type { SearchResult } from "@/features/filesystem/domain/file-entry"
 import { logger } from "@/shared/lib/logger"
 
@@ -74,6 +74,46 @@ export function useSearch(root: string, query: string, enabled: boolean) {
     return () => {
       window.clearTimeout(timer)
       // Discard pending IPC callbacks + clear loading for this query.
+      reqIdRef.current++
+      setLoading(false)
+    }
+  }, [root, query, enabled])
+
+  return { results, loading }
+}
+
+export function useGrep(root: string, query: string, enabled: boolean) {
+  const [results, setResults] = useState<GrepHit[]>([])
+  const [loading, setLoading] = useState(false)
+  const reqIdRef = useRef(0)
+
+  useEffect(() => {
+    if (!enabled || !query.trim()) {
+      setResults([])
+      setLoading(false)
+      return
+    }
+    setLoading(true)
+    const myReq = ++reqIdRef.current
+    const timer = window.setTimeout(() => {
+      if (myReq !== reqIdRef.current) return
+      fsGateway
+        .grep(root, query)
+        .then((r) => {
+          if (myReq !== reqIdRef.current) return
+          setResults(r)
+        })
+        .catch((e) => {
+          if (myReq !== reqIdRef.current) return
+          logger.error("grep failed", e)
+          setResults([])
+        })
+        .finally(() => {
+          if (myReq === reqIdRef.current) setLoading(false)
+        })
+    }, 200)
+    return () => {
+      window.clearTimeout(timer)
       reqIdRef.current++
       setLoading(false)
     }

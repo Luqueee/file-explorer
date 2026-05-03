@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from "react"
-import { fsGateway } from "../infra/fs.gateway"
+import { fsGateway, type SortBy, type SortDir } from "../infra/fs.gateway"
 import type { FileEntry } from "../domain/file-entry"
 import { fsErrorMessage } from "../domain/fs-error"
 import { logger } from "@/shared/lib/logger"
@@ -12,12 +12,14 @@ export function useDirectory(path: string) {
   const [offset, setOffset] = useState(0)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [sortBy, setSortBy] = useState<SortBy>("name")
+  const [sortDir, setSortDir] = useState<SortDir>("asc")
 
-  const load = useCallback(async (p: string, off = 0) => {
+  const load = useCallback(async (p: string, off: number, sb: SortBy, sd: SortDir) => {
     setLoading(true)
     if (off === 0) setError(null)
     try {
-      const page = await fsGateway.list(p, { limit: PAGE_SIZE, offset: off })
+      const page = await fsGateway.list(p, { limit: PAGE_SIZE, offset: off, sortBy: sb, sortDir: sd })
       setEntries((prev) => off === 0 ? page.entries : [...prev, ...page.entries])
       setTotal(page.total)
       setOffset(off + page.entries.length)
@@ -30,17 +32,17 @@ export function useDirectory(path: string) {
   }, [])
 
   useEffect(() => {
-    load(path, 0)
-  }, [path, load])
+    load(path, 0, sortBy, sortDir)
+  }, [path, sortBy, sortDir, load])
 
   const reload = useCallback(() => {
     setOffset(0)
-    return load(path, 0)
-  }, [path, load])
+    return load(path, 0, sortBy, sortDir)
+  }, [path, sortBy, sortDir, load])
 
   const loadMore = useCallback(() => {
-    return load(path, offset)
-  }, [path, offset, load])
+    return load(path, offset, sortBy, sortDir)
+  }, [path, offset, sortBy, sortDir, load])
 
   const hasMore = offset < total
 
@@ -55,7 +57,20 @@ export function useDirectory(path: string) {
     []
   )
 
-  return { entries, loading, error, reload, total, hasMore, loadMore, setEntriesFromPage }
+  return {
+    entries,
+    loading,
+    error,
+    reload,
+    total,
+    hasMore,
+    loadMore,
+    setEntriesFromPage,
+    sortBy,
+    sortDir,
+    setSortBy,
+    setSortDir,
+  }
 }
 
 export function useHomeDir() {

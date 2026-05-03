@@ -91,11 +91,14 @@ export function useFileOps(
       }),
 
     removeMany: (paths: string[]) =>
-      wrap(async () => {
-        for (const p of paths) await fsGateway.delete(p)
-      }),
+      wrap(() => fsGateway.deleteMany(paths)),
 
     open: (path: string) =>
       fsGateway.open(path).catch((e) => logger.error("open failed", e)),
+
+    compress: (paths: string[], destDir: string, archiveName?: string) =>
+      wrap(async () => {
+        await fsGateway.compress(paths, destDir, archiveName ?? null)
+      }),
   }
 }

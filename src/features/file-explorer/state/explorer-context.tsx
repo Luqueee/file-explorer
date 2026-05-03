@@ -14,6 +14,7 @@ import { useHotkey } from "@tanstack/react-hotkeys"
 import { useAction } from "@/features/hotkeys/bindings"
 import { DndContext, DragOverlay } from "@dnd-kit/core"
 import { useDirectory } from "@/features/filesystem/api/use-directory"
+import type { SortBy, SortDir } from "@/features/filesystem/infra/fs.gateway"
 import { useFileOps } from "@/features/filesystem/api/use-file-ops"
 import { useClipboard } from "@/features/filesystem/api/use-clipboard"
 import {
@@ -107,6 +108,16 @@ interface Value {
 
   handleActivate: (entry: FileEntry) => void
   handlePaste: () => Promise<void>
+  compress: (paths: string[]) => Promise<void>
+
+  sortBy: SortBy
+  sortDir: SortDir
+  setSortBy: (s: SortBy) => void
+  setSortDir: (d: SortDir) => void
+
+  quickLookEntry: FileEntry | null
+  openQuickLook: (entry: FileEntry) => void
+  closeQuickLook: () => void
 
   canUndo: boolean
   undoLabel: string | null
@@ -142,7 +153,10 @@ export function FileExplorerProvider({
   onOpenSettings,
   children,
 }: ProviderProps) {
-  const { entries, loading, error, reload, total, hasMore, loadMore, setEntriesFromPage } = useDirectory(path)
+  const {
+    entries, loading, error, reload, total, hasMore, loadMore, setEntriesFromPage,
+    sortBy, sortDir, setSortBy, setSortDir,
+  } = useDirectory(path)
   const { clipboard, copy, cut, clear: clearClipboard, hasPath: clipboardHas } = useClipboard()
   const undoStack = useUndoStack()
   const ops = useFileOps(reload, undoStack, setEntriesFromPage)
@@ -216,6 +230,15 @@ export function FileExplorerProvider({
     await ops.paste(clipboard, path)
     if (clipboard.op === "cut") clearClipboard()
   }, [clipboard, ops, path, clearClipboard])
+
+  const compress = useCallback(async (paths: string[]) => {
+    if (paths.length === 0) return
+    await ops.compress(paths, path)
+  }, [ops, path])
+
+  const [quickLookEntry, setQuickLookEntry] = useState<FileEntry | null>(null)
+  const openQuickLook = useCallback((e: FileEntry) => setQuickLookEntry(e), [])
+  const closeQuickLook = useCallback(() => setQuickLookEntry(null), [])
 
   const confirmDelete = useCallback(async () => {
     if (deleteTargets.length === 0) return
@@ -313,6 +336,14 @@ export function FileExplorerProvider({
   useAction("view.settings", () => {
     onOpenSettings()
   }, { ignoreInputs: true })
+
+  useAction("view.quickLook", () => {
+    if (quickLookEntry) {
+      closeQuickLook()
+      return
+    }
+    if (selEntry && !selEntry.is_dir) openQuickLook(selEntry)
+  }, { enabled: navEnabled || !!quickLookEntry, ignoreInputs: true })
 
   useAction("selection.all", () => {
     selection.selectAll(filteredEntries.map((en) => en.path))
@@ -433,6 +464,14 @@ export function FileExplorerProvider({
     totalCount: entries.length,
     handleActivate,
     handlePaste,
+    compress,
+    sortBy,
+    sortDir,
+    setSortBy,
+    setSortDir,
+    quickLookEntry,
+    openQuickLook,
+    closeQuickLook,
     canUndo: undoStack.canUndo,
     undoLabel: undoStack.peek ? describeUndoOp(undoStack.peek) : null,
     undo,
@@ -449,7 +488,10 @@ export function FileExplorerProvider({
     deleteTargets, setDeleteTargets, confirmDelete, clipboardHas,
     dnd.draggingEntry, dnd.copyMode, viewMode, setViewMode,
     terminalId, onOpenSettings, segments, parent, dirCount, fileCount,
-    handleActivate, handlePaste, undoStack.canUndo, undoStack.peek, undo,
+    handleActivate, handlePaste, compress,
+    sortBy, sortDir, setSortBy, setSortDir,
+    quickLookEntry, openQuickLook, closeQuickLook,
+    undoStack.canUndo, undoStack.peek, undo,
   ])
 
   return (

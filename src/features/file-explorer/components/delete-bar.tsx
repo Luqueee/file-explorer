@@ -14,13 +14,13 @@ export function DeleteBar() {
     <div className="flex w-full shrink-0 items-center gap-3 border-t border-destructive/40 bg-destructive/10 px-4 py-2 text-sm">
       <Trash2 className="h-4 w-4 shrink-0 text-destructive" />
       <span className="flex-1 truncate">
-        ¿Eliminar <strong>{label}</strong>? No se puede deshacer.
+        ¿Mover <strong>{label}</strong> a la papelera?
       </span>
       <button
         onClick={confirmDelete}
         className="text-destructive-foreground rounded bg-destructive px-3 py-1 text-xs font-medium hover:bg-destructive/90"
       >
-        Eliminar
+        Mover a papelera
       </button>
       <button
         onClick={() => setDeleteTargets([])}

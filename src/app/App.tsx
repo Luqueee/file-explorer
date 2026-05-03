@@ -9,6 +9,7 @@ import { DeleteBar } from "@/features/file-explorer/components/delete-bar"
 import { ErrorBar } from "@/features/file-explorer/components/error-bar"
 import { StatusFooter } from "@/features/file-explorer/components/status-footer"
 import { FileContextMenu } from "@/features/file-explorer/components/context-menu"
+import { QuickLookHost } from "@/features/file-explorer/components/quick-look-host"
 import { FileExplorerProvider } from "@/features/file-explorer/state/explorer-context"
 import { SearchPalette } from "@/features/search/components/search-palette"
 import { SettingsPanel } from "@/features/settings/components/settings-panel"
@@ -88,6 +89,7 @@ export default function App() {
             <StatusFooter />
           </SidebarProvider>
           <FileContextMenu />
+          <QuickLookHost />
         </FileExplorerProvider>
       ) : (
         <div className="flex h-svh items-center justify-center text-sm text-muted-foreground">

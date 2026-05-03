@@ -37,6 +37,7 @@ export const HOTKEY_ACTIONS = [
   { id: "view.editPath", label: "Editar ruta", group: "Vista", defaultHotkey: "Mod+L" },
   { id: "view.terminal", label: "Abrir terminal", group: "Vista", defaultHotkey: "Mod+T" },
   { id: "view.settings", label: "Abrir configuración", group: "Vista", defaultHotkey: "Mod+," },
+  { id: "view.quickLook", label: "Vista previa rápida", group: "Vista", defaultHotkey: "Space" },
 
   // Historial
   { id: "history.undo", label: "Deshacer", group: "Historial", defaultHotkey: "Mod+Z" },

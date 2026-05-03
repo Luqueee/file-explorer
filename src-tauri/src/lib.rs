@@ -5,8 +5,11 @@ use tauri::{Manager, TitleBarStyle, WebviewUrl, WebviewWindowBuilder};
 use tauri_plugin_log::{Target, TargetKind};
 use tauri_plugin_opener::OpenerExt;
 
+mod archive;
 mod fs;
+mod grep;
 mod path_safety;
+mod preview;
 mod search;
 mod smb;
 mod system;
@@ -120,8 +123,12 @@ pub fn run() {
             fs::rename_entry,
             fs::rename_and_list,
             fs::delete_entry,
+            fs::delete_entries,
             fs::copy_entry,
             fs::move_entry,
+            archive::compress_entries,
+            preview::preview_file,
+            grep::grep_content,
             search::search_files,
             search::index_path,
             search::clear_search_index,

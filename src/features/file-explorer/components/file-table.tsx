@@ -1,4 +1,5 @@
-import { AlertCircle, FileText, Folder, FolderOpen, Loader2, Search } from "lucide-react"
+import { AlertCircle, ArrowDown, ArrowUp, ArrowUpDown, FileText, Folder, FolderOpen, Loader2, Search } from "lucide-react"
+import type { SortBy } from "@/features/filesystem/infra/fs.gateway"
 import { useVirtualizer } from "@tanstack/react-virtual"
 import { Button } from "@/components/ui/button"
 import { formatSize, formatDate } from "@/shared/lib/format"
@@ -86,6 +87,37 @@ export function FileTable() {
   )
 }
 
+function SortHeader({
+  column,
+  label,
+  align,
+  sortBy,
+  sortDir,
+  onSort,
+}: {
+  column: SortBy
+  label: string
+  align: "left" | "right"
+  sortBy: SortBy
+  sortDir: "asc" | "desc"
+  onSort: (c: SortBy) => void
+}) {
+  const active = sortBy === column
+  const Icon = active ? (sortDir === "asc" ? ArrowUp : ArrowDown) : ArrowUpDown
+  return (
+    <button
+      type="button"
+      onClick={() => onSort(column)}
+      className={`flex w-full items-center gap-1.5 text-xs font-medium tracking-wider uppercase transition-colors hover:text-foreground ${
+        active ? "text-foreground" : "text-muted-foreground"
+      } ${align === "right" ? "justify-end" : "justify-start"}`}
+    >
+      <span>{label}</span>
+      <Icon className={`h-3 w-3 ${active ? "" : "opacity-50"}`} />
+    </button>
+  )
+}
+
 function VirtualTable() {
   const {
     filteredEntries,
@@ -102,7 +134,20 @@ function VirtualTable() {
     cancelInline,
     handleActivate,
     openContextMenu,
+    sortBy,
+    sortDir,
+    setSortBy,
+    setSortDir,
   } = useFileExplorer()
+
+  const handleSort = (col: SortBy) => {
+    if (sortBy === col) {
+      setSortDir(sortDir === "asc" ? "desc" : "asc")
+    } else {
+      setSortBy(col)
+      setSortDir(col === "name" ? "asc" : "desc")
+    }
+  }
 
   const virtualizer = useVirtualizer({
     count: filteredEntries.length,
@@ -121,14 +166,35 @@ function VirtualTable() {
     <table className="w-full text-sm" role="grid" aria-multiselectable="true">
       <thead className="sticky top-0 z-10 bg-background/95 backdrop-blur">
         <tr className="border-b border-border/60">
-          <th className="px-4 py-2 text-left text-xs font-medium tracking-wider text-muted-foreground uppercase">
-            Nombre
+          <th className="px-4 py-2 text-left">
+            <SortHeader
+              column="name"
+              label="Nombre"
+              align="left"
+              sortBy={sortBy}
+              sortDir={sortDir}
+              onSort={handleSort}
+            />
           </th>
-          <th className="w-28 px-4 py-2 text-right text-xs font-medium tracking-wider text-muted-foreground uppercase">
-            Tamaño
+          <th className="w-28 px-4 py-2 text-right">
+            <SortHeader
+              column="size"
+              label="Tamaño"
+              align="right"
+              sortBy={sortBy}
+              sortDir={sortDir}
+              onSort={handleSort}
+            />
           </th>
-          <th className="w-36 px-4 py-2 text-right text-xs font-medium tracking-wider text-muted-foreground uppercase">
-            Modificado
+          <th className="w-36 px-4 py-2 text-right">
+            <SortHeader
+              column="modified"
+              label="Modificado"
+              align="right"
+              sortBy={sortBy}
+              sortDir={sortDir}
+              onSort={handleSort}
+            />
           </th>
         </tr>
       </thead>
