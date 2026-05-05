@@ -77,6 +77,11 @@ export function useSelection() {
     setAnchorPath(paths[paths.length - 1])
   }, [])
 
+  const add = useCallback((path: string) => {
+    setSelectedPaths((prev) => new Set([...prev, path]))
+    setAnchorPath(path)
+  }, [])
+
   return {
     selectedPaths,
     anchorPath,
@@ -84,6 +89,7 @@ export function useSelection() {
     select,
     replace,
     selectAll,
+    add,
     clear,
   }
 }

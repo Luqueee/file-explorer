@@ -6,6 +6,7 @@ import { fsErrorMessage } from "@/features/filesystem/domain/fs-error"
 import { isArchive } from "@/features/filesystem/domain/file-entry"
 import type { FileEntry } from "@/features/filesystem/domain/file-entry"
 import { formatSize } from "@/shared/lib/format"
+import { VideoPlayer } from "./video-player"
 
 export type Density = "comfortable" | "compact"
 
@@ -105,13 +106,7 @@ function PreviewKind({
     case "audio":
       return <audio controls src={assetSrc} className="w-full max-w-md" />
     case "video":
-      return (
-        <video
-          controls
-          src={assetSrc}
-          className={compact ? "max-h-full max-w-full" : "max-h-[70vh] max-w-full"}
-        />
-      )
+      return <VideoPlayer src={assetSrc} compact={compact} />
     case "pdf":
       return (
         <iframe

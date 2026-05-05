@@ -1,8 +1,14 @@
+import { useHotkey } from "@tanstack/react-hotkeys"
 import { Trash2 } from "lucide-react"
 import { useFileExplorer } from "../state/explorer-context"
 
 export function DeleteBar() {
   const { deleteTargets, setDeleteTargets, confirmDelete } = useFileExplorer()
+
+  useHotkey("Enter", () => { confirmDelete() }, {
+    enabled: deleteTargets.length > 0,
+    ignoreInputs: false,
+  })
   if (deleteTargets.length === 0) return null
 
   const label =

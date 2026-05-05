@@ -1,4 +1,4 @@
-import { Archive, PackageOpen, X } from "lucide-react"
+import { Archive, CheckCircle2, PackageOpen, X } from "lucide-react"
 import { useArchiveOperations } from "../hooks/use-archive-operations"
 
 // ---------------------------------------------------------------------------
@@ -22,38 +22,70 @@ export function ArchiveProgressPanel() {
   if (operations.length === 0) return null
 
   return (
-    <div className="fixed bottom-20 right-4 z-50 flex flex-col gap-2 w-72">
+    <div className="fixed right-4 bottom-10 z-50 flex w-72 flex-col gap-2">
       {operations.map((op) => {
         const isCompress = op.operation === "compress"
+
+        if (op.done) {
+          const pastVerb = isCompress ? "Comprimido" : "Descomprimido"
+          return (
+            <div
+              key={op.id}
+              className="w-72 rounded-lg border border-border bg-popover p-3 shadow-xl"
+            >
+              <div className="mb-1 flex items-center justify-between">
+                <div className="flex items-center gap-1.5 text-sm font-medium">
+                  <CheckCircle2 className="h-4 w-4 shrink-0" />
+                  <span>{pastVerb}</span>
+                </div>
+              </div>
+              {op.outputName && (
+                <p className="mb-2 truncate text-xs text-muted-foreground">
+                  {op.outputName}
+                </p>
+              )}
+              <div className="mb-1.5 h-1.5 overflow-hidden rounded-full bg-muted">
+                <div className="h-full w-full rounded-full bg-primary" />
+              </div>
+              <div className="flex justify-between text-[11px] text-muted-foreground">
+                <span>Completado</span>
+                <span>100%</span>
+              </div>
+            </div>
+          )
+        }
+
         const Icon = isCompress ? Archive : PackageOpen
         const verb = isCompress ? "Comprimiendo" : "Descomprimiendo"
         const percent =
-          op.total > 0 ? Math.min(100, Math.round((op.current / op.total) * 100)) : 0
+          op.total > 0
+            ? Math.min(100, Math.round((op.current / op.total) * 100))
+            : 0
         const indeterminate = op.total < 0 || op.current === 0
 
         return (
           <div
             key={op.id}
-            className="bg-popover border border-border rounded-lg shadow-xl p-3 w-72"
+            className="w-72 rounded-lg border border-border bg-popover p-3 shadow-xl"
           >
             {/* Header row */}
-            <div className="flex items-center justify-between mb-1">
+            <div className="mb-1 flex items-center justify-between">
               <div className="flex items-center gap-1.5 text-sm font-medium">
-                <Icon className="w-4 h-4 shrink-0" />
+                <Icon className="h-4 w-4 shrink-0" />
                 <span>{verb}</span>
               </div>
               <button
                 onClick={() => cancel(op.id)}
-                className="rounded p-0.5 hover:bg-muted transition-colors"
+                className="rounded p-0.5 transition-colors hover:bg-muted"
                 aria-label="Cancelar"
               >
-                <X className="w-3.5 h-3.5" />
+                <X className="h-3.5 w-3.5" />
               </button>
             </div>
 
             {/* Label row */}
             {op.label ? (
-              <p className="text-xs text-muted-foreground truncate mb-2">
+              <p className="mb-2 truncate text-xs text-muted-foreground">
                 {op.label}
               </p>
             ) : (
@@ -61,19 +93,19 @@ export function ArchiveProgressPanel() {
             )}
 
             {/* Progress bar */}
-            <div className="h-1.5 bg-muted rounded-full overflow-hidden mb-1.5">
+            <div className="mb-1.5 h-1.5 overflow-hidden rounded-full bg-muted">
               {indeterminate ? (
-                <div className="h-full w-full bg-primary/60 animate-pulse opacity-70" />
+                <div className="h-full w-full animate-pulse bg-primary/60 opacity-70" />
               ) : (
                 <div
-                  className="h-full bg-primary rounded-full transition-[width] duration-300"
+                  className="h-full rounded-full bg-primary transition-[width] duration-300"
                   style={{ width: `${percent}%` }}
                 />
               )}
             </div>
 
             {/* Stats row */}
-            <div className="text-[11px] text-muted-foreground flex justify-between">
+            <div className="flex justify-between text-[11px] text-muted-foreground">
               <span>
                 {indeterminate
                   ? `${op.current} entradas`

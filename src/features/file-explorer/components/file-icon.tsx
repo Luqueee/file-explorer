@@ -116,13 +116,13 @@ const EXT_ICON: Record<string, string> = {
   mkv: "vscode-icons:file-type-video",
   webm: "vscode-icons:file-type-video",
   m4v: "vscode-icons:file-type-video",
-  mp3: "vscode-icons:file-type-audio",
-  wav: "vscode-icons:file-type-audio",
-  flac: "vscode-icons:file-type-audio",
-  aac: "vscode-icons:file-type-audio",
-  ogg: "vscode-icons:file-type-audio",
-  m4a: "vscode-icons:file-type-audio",
-  opus: "vscode-icons:file-type-audio",
+  mp3: "ph:music-note-fill",
+  wav: "ph:music-note-fill",
+  flac: "ph:music-note-fill",
+  aac: "ph:music-note-fill",
+  ogg: "ph:music-note-fill",
+  m4a: "ph:music-note-fill",
+  opus: "ph:music-note-fill",
   zip: "vscode-icons:file-type-zip",
   tar: "vscode-icons:file-type-zip",
   gz: "vscode-icons:file-type-zip",
@@ -154,7 +154,15 @@ export function FileIcon({ name, isDir, extension, size = 16 }: Props) {
   if (nameIcon) return <Icon icon={nameIcon} width={size} height={size} />
 
   const extIcon = extension ? EXT_ICON[extension] : null
-  if (extIcon) return <Icon icon={extIcon} width={size} height={size} />
+  if (extIcon)
+    return (
+      <Icon
+        icon={extIcon}
+        width={size}
+        height={size}
+        style={extIcon.startsWith("ph:") ? { color: "oklch(0.75 0.12 290)" } : undefined}
+      />
+    )
 
   return <File className={`${cls} text-muted-foreground`} style={style} />
 }

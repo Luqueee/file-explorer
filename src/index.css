@@ -80,7 +80,7 @@
 
   --border: oklch(1 0 0 / 8%);
   --input: oklch(1 0 0 / 12%);
-  --ring: oklch(0.78 0.13 175 / 50%);
+  --ring: transparent;
 
   /* Charts — degradado teal → ámbar */
   --chart-1: oklch(0.78 0.13 175);
@@ -97,12 +97,12 @@
   --sidebar-accent: oklch(0.28 0.025 175);
   --sidebar-accent-foreground: oklch(0.97 0.01 175);
   --sidebar-border: oklch(1 0 0 / 6%);
-  --sidebar-ring: oklch(0.78 0.13 175 / 50%);
+  --sidebar-ring: transparent;
 }
 
 @layer base {
   * {
-    @apply border-border outline-ring/50;
+    @apply border-border outline-none;
   }
   body {
     @apply bg-background text-foreground;

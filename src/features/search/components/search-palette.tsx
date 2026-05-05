@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react"
-import { Search, FileText, Loader2, CornerDownLeft } from "lucide-react"
+import { Search, FileText, Loader2, CornerDownLeft, FolderOpen } from "lucide-react"
 import { useGrep, useSearch, useSearchIndex } from "../api/use-search"
 import { FileIcon } from "@/features/file-explorer/components/file-icon"
 import { formatSize, formatDate } from "@/shared/lib/format"
@@ -110,6 +110,11 @@ export function SearchPalette({
     onClose()
   }
 
+  function handleGoToFolder(folderPath: string) {
+    onNavigate(folderPath || "/")
+    onClose()
+  }
+
   if (!open) return null
 
   const placeholder =
@@ -182,12 +187,14 @@ export function SearchPalette({
             nameResults.map((r, i) => {
               const parent = r.path.slice(0, r.path.length - r.name.length - 1)
               return (
-                <button
+                <div
                   key={r.path}
                   data-index={i}
+                  role="button"
+                  tabIndex={-1}
                   onClick={() => handleSelectName(r)}
                   onMouseEnter={() => setSelected(i)}
-                  className={`flex w-full items-center gap-3 px-4 py-2 text-left text-sm ${
+                  className={`group flex w-full cursor-pointer items-center gap-3 px-4 py-2 text-left text-sm ${
                     i === selected
                       ? "bg-accent text-accent-foreground"
                       : "text-foreground"
@@ -204,25 +211,38 @@ export function SearchPalette({
                       {parent || "/"}
                     </span>
                   </div>
-                  <div className="ml-2 flex shrink-0 flex-col items-end text-[11px] text-muted-foreground tabular-nums">
-                    <span>{r.is_dir ? "carpeta" : formatSize(r.size)}</span>
-                    <span>{formatDate(r.modified)}</span>
+                  <div className="ml-2 flex shrink-0 items-center gap-2">
+                    <div className="flex flex-col items-end text-[11px] text-muted-foreground tabular-nums">
+                      <span>{r.is_dir ? "carpeta" : formatSize(r.size)}</span>
+                      <span>{formatDate(r.modified)}</span>
+                    </div>
+                    <button
+                      title="Ir a la carpeta"
+                      onClick={(e) => { e.stopPropagation(); handleGoToFolder(parent) }}
+                      className="invisible rounded p-1 text-muted-foreground hover:bg-background/20 hover:text-foreground group-hover:visible"
+                    >
+                      <FolderOpen className="h-3.5 w-3.5" />
+                    </button>
                   </div>
-                </button>
+                </div>
               )
             })}
 
           {mode === "content" &&
-            grepResults.map((h, i) => (
-              <GrepRow
-                key={`${h.path}:${h.line_number}:${i}`}
-                hit={h}
-                index={i}
-                selected={i === selected}
-                onSelect={() => handleSelectGrep(h)}
-                onHover={() => setSelected(i)}
-              />
-            ))}
+            grepResults.map((h, i) => {
+              const parent = h.path.slice(0, h.path.lastIndexOf("/"))
+              return (
+                <GrepRow
+                  key={`${h.path}:${h.line_number}:${i}`}
+                  hit={h}
+                  index={i}
+                  selected={i === selected}
+                  onSelect={() => handleSelectGrep(h)}
+                  onHover={() => setSelected(i)}
+                  onGoToFolder={() => handleGoToFolder(parent)}
+                />
+              )
+            })}
         </div>
 
         {itemCount > 0 && (
@@ -294,12 +314,14 @@ function GrepRow({
   selected,
   onSelect,
   onHover,
+  onGoToFolder,
 }: {
   hit: GrepHit
   index: number
   selected: boolean
   onSelect: () => void
   onHover: () => void
+  onGoToFolder: () => void
 }) {
   const name = useMemo(() => hit.path.split("/").at(-1) ?? hit.path, [hit.path])
   const parent = useMemo(
@@ -311,26 +333,33 @@ function GrepRow({
   const after = hit.line.slice(hit.match_end)
 
   return (
-    <button
+    <div
       data-index={index}
+      role="button"
+      tabIndex={-1}
       onClick={onSelect}
       onMouseEnter={onHover}
-      className={`flex w-full flex-col gap-0.5 px-4 py-2 text-left text-sm ${
+      className={`group flex w-full cursor-pointer flex-col gap-0.5 px-4 py-2 text-left text-sm ${
         selected ? "bg-accent text-accent-foreground" : "text-foreground"
       }`}
     >
       <div className="flex items-center gap-2 text-[11px] text-muted-foreground">
         <span className="truncate font-medium text-foreground">{name}</span>
         <span className="truncate">{parent || "/"}</span>
-        <span className="ml-auto shrink-0 tabular-nums">
-          :{hit.line_number}
-        </span>
+        <span className="ml-auto shrink-0 tabular-nums">:{hit.line_number}</span>
+        <button
+          title="Ir a la carpeta"
+          onClick={(e) => { e.stopPropagation(); onGoToFolder() }}
+          className="invisible rounded p-1 hover:bg-background/20 hover:text-foreground group-hover:visible"
+        >
+          <FolderOpen className="h-3.5 w-3.5" />
+        </button>
       </div>
       <pre className="truncate font-mono text-xs text-muted-foreground">
         {before}
         <mark className="bg-amber-400/30 text-foreground">{match}</mark>
         {after}
       </pre>
-    </button>
+    </div>
   )
 }

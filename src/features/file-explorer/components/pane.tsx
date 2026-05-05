@@ -86,11 +86,11 @@ export function Pane({
       active={isActive}
       clipboardApi={clipboardApi}
     >
-      {headerContainer && createPortal(
+      {headerContainer && isActive && createPortal(
         <div className="min-w-0 flex-1 overflow-hidden"><Toolbar /></div>,
         headerContainer
       )}
-      {filterContainer && createPortal(
+      {filterContainer && isActive && createPortal(
         <div className="min-w-0 flex-1 overflow-hidden"><FilterBar /></div>,
         filterContainer
       )}

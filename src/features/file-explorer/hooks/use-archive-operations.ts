@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react"
 import { listen } from "@tauri-apps/api/event"
 import { toast } from "sonner"
 import { fsGateway } from "@/features/filesystem/infra/fs.gateway"
+import { playArchiveDone } from "@/shared/lib/sounds"
 
 export interface ArchiveOperation {
   id: string
@@ -11,6 +12,8 @@ export interface ArchiveOperation {
   label: string
   startedAt: number
   etaMs: number | null
+  done: boolean
+  outputName: string | null
 }
 
 interface ArchiveProgressEvent {
@@ -41,24 +44,41 @@ export function useArchiveOperations() {
           payload
 
         if (done) {
-          setOperations((prev) => {
-            const next = new Map(prev)
-            next.delete(id)
-            return next
-          })
-
           if (cancelled) {
-            // Silently dismiss — the user already clicked cancel
+            setOperations((prev) => {
+              const next = new Map(prev)
+              next.delete(id)
+              return next
+            })
             return
           }
 
           if (output != null) {
-            const filename = output.split("/").pop() ?? output
-            const pastVerb =
-              operation === "compress" ? "Comprimido" : "Descomprimido"
-            toast.success(`${pastVerb}: ${filename}`)
+            const outputName = output.split("/").pop() ?? output
+            playArchiveDone()
+            setOperations((prev) => {
+              const next = new Map(prev)
+              const existing = next.get(id)
+              next.set(id, {
+                ...(existing ?? { id, operation, current: 1, total: 1, label, startedAt: Date.now(), etaMs: null }),
+                done: true,
+                outputName,
+              })
+              return next
+            })
+            setTimeout(() => {
+              setOperations((prev) => {
+                const next = new Map(prev)
+                next.delete(id)
+                return next
+              })
+            }, 3500)
           } else {
-            // label carries the error message on failure
+            setOperations((prev) => {
+              const next = new Map(prev)
+              next.delete(id)
+              return next
+            })
             toast.error(label)
           }
           return
@@ -79,6 +99,8 @@ export function useArchiveOperations() {
               label,
               startedAt: Date.now(),
               etaMs: null,
+              done: false,
+              outputName: null,
             })
           } else {
             // Subsequent event — update progress and recompute ETA

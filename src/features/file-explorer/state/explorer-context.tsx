@@ -407,6 +407,11 @@ export function FileExplorerProvider({
     if (sel.length > 0) setDeleteTargets(sel)
   }, { enabled: navEnabled && !!selEntry })
 
+  useHotkey("Mod+Backspace", () => {
+    const sel = selectedEntries()
+    if (sel.length > 0) setDeleteTargets(sel)
+  }, { enabled: active && navEnabled && !!selEntry })
+
   useAction("file.duplicate", () => {
     const sel = selectedEntries()
     for (const entry of sel) duplicate(entry.path)
@@ -492,6 +497,26 @@ export function FileExplorerProvider({
       scrollToSelected(prev.path)
     }
   }, { enabled: navEnabled })
+
+  useHotkey("Meta+ArrowDown", () => {
+    if (filteredEntries.length === 0) return
+    const idx = selected ? filteredEntries.findIndex((en) => en.path === selected) : -1
+    const next = filteredEntries[Math.min(idx + 1, filteredEntries.length - 1)]
+    if (next && next.path !== selected) {
+      selection.add(next.path)
+      scrollToSelected(next.path)
+    }
+  }, { enabled: active && navEnabled })
+
+  useHotkey("Meta+ArrowUp", () => {
+    if (filteredEntries.length === 0) return
+    const idx = selected ? filteredEntries.findIndex((en) => en.path === selected) : 0
+    const prev = filteredEntries[Math.max(idx - 1, 0)]
+    if (prev && prev.path !== selected) {
+      selection.add(prev.path)
+      scrollToSelected(prev.path)
+    }
+  }, { enabled: active && navEnabled })
 
   useActiveAction("nav.activate", () => {
     if (selEntry) handleActivate(selEntry)
