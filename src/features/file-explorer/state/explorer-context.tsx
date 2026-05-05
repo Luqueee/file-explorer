@@ -10,8 +10,9 @@ import {
   type ReactNode,
   type MouseEvent as ReactMouseEvent,
 } from "react"
-import { useHotkey } from "@tanstack/react-hotkeys"
+import { useHotkey, type UseHotkeyOptions } from "@tanstack/react-hotkeys"
 import { useAction } from "@/features/hotkeys/bindings"
+import type { HotkeyActionId } from "@/features/hotkeys/registry"
 import { DndContext, DragOverlay } from "@dnd-kit/core"
 import { toast } from "sonner"
 import { useDirectory } from "@/features/filesystem/api/use-directory"
@@ -19,13 +20,15 @@ import { fsGateway, type SortBy, type SortDir } from "@/features/filesystem/infr
 import { fsErrorMessage } from "@/features/filesystem/domain/fs-error"
 import { useFileOps } from "@/features/filesystem/api/use-file-ops"
 import { useClipboard } from "@/features/filesystem/api/use-clipboard"
+
+type ClipboardApi = ReturnType<typeof useClipboard>
 import {
   pathSegments,
   parentPath,
   type PathSegment,
 } from "@/features/filesystem/domain/path"
 import type { FileEntry } from "@/features/filesystem/domain/file-entry"
-import { isShellScript, isArchive } from "@/features/filesystem/domain/file-entry"
+import { isShellScript } from "@/features/filesystem/domain/file-entry"
 import { isMacJunk } from "@/features/filesystem/domain/mac-junk"
 import type { Clipboard } from "@/features/filesystem/domain/clipboard"
 import type { ContextMenuState } from "../types"
@@ -161,6 +164,8 @@ interface ProviderProps {
   isFavorite: boolean
   terminalId: string | null
   onOpenSettings: () => void
+  active?: boolean
+  clipboardApi?: ClipboardApi
   children: ReactNode
 }
 
@@ -176,6 +181,8 @@ export function FileExplorerProvider({
   isFavorite,
   terminalId,
   onOpenSettings,
+  active = true,
+  clipboardApi,
   children,
 }: ProviderProps) {
   const { sortBy, sortDir, setSortBy, setSortDir } = useSortPref()
@@ -183,7 +190,9 @@ export function FileExplorerProvider({
   const {
     entries, loading, error, reload, total, hasMore, loadMore, setEntriesFromPage,
   } = useDirectory(path, sortBy, sortDir)
-  const { clipboard, copy, cut, clear: clearClipboard, hasPath: clipboardHas } = useClipboard()
+  const localClipboard = useClipboard()
+  const { clipboard, copy, cut, clear: clearClipboard, hasPath: clipboardHas } =
+    clipboardApi ?? localClipboard
   const undoStack = useUndoStack()
   const ops = useFileOps(reload, undoStack, setEntriesFromPage)
 
@@ -348,6 +357,14 @@ export function FileExplorerProvider({
       ?.scrollIntoView({ block: "nearest" })
   }, [])
 
+  const useActiveAction = (
+    id: HotkeyActionId,
+    fn: (e: KeyboardEvent) => void,
+    opts?: UseHotkeyOptions
+  ) => {
+    useAction(id, fn, { ...opts, enabled: active && (opts?.enabled ?? true) })
+  }
+
   useHotkey("Escape", () => {
     if (contextMenu) return setContextMenu(null)
     if (deleteTargets.length > 0) return setDeleteTargets([])
@@ -360,29 +377,29 @@ export function FileExplorerProvider({
     if (selection.selectedPaths.size > 1) selection.clear()
   }, { ignoreInputs: false, preventDefault: false })
 
-  useAction("filter.focus", () => {
+  useActiveAction("filter.focus", () => {
     filterRef.current?.focus()
   })
 
-  useAction("file.copy", () => {
+  useActiveAction("file.copy", () => {
     const sel = selectedEntries()
     if (sel.length > 0) copy(sel.map((e) => e.path))
   }, { enabled: navEnabled && !!selEntry, ignoreInputs: true })
 
-  useAction("file.cut", () => {
+  useActiveAction("file.cut", () => {
     const sel = selectedEntries()
     if (sel.length > 0) cut(sel.map((e) => e.path))
   }, { enabled: navEnabled && !!selEntry, ignoreInputs: true })
 
-  useAction("file.paste", () => {
+  useActiveAction("file.paste", () => {
     if (clipboard) handlePaste()
   }, { enabled: navEnabled && !!clipboard, ignoreInputs: true })
 
-  useAction("file.rename", () => {
+  useActiveAction("file.rename", () => {
     if (selEntry) inline.startRename(selEntry)
   }, { enabled: navEnabled && !!selEntry })
 
-  useAction("file.delete", () => {
+  useActiveAction("file.delete", () => {
     const sel = selectedEntries()
     if (sel.length > 0) setDeleteTargets(sel)
   }, { enabled: navEnabled && !!selEntry })
@@ -407,36 +424,36 @@ export function FileExplorerProvider({
     ignoreInputs: true,
   })
 
-  useAction("file.newFile", () => {
+  useActiveAction("file.newFile", () => {
     inline.startNewFile()
   }, { enabled: navEnabled, ignoreInputs: true })
 
-  useAction("file.newFolder", () => {
+  useActiveAction("file.newFolder", () => {
     inline.startNewFolder()
   }, { enabled: navEnabled, ignoreInputs: true })
 
-  useAction("history.undo", async () => {
+  useActiveAction("history.undo", async () => {
     await undoStack.undo()
     await reload()
   }, { enabled: undoStack.canUndo, ignoreInputs: true })
 
-  useAction("view.reload", () => {
+  useActiveAction("view.reload", () => {
     reload()
   }, { ignoreInputs: true })
 
-  useAction("view.list", () => {
+  useActiveAction("view.list", () => {
     setViewMode("list")
   }, { ignoreInputs: true })
 
-  useAction("view.grid", () => {
+  useActiveAction("view.grid", () => {
     setViewMode("grid")
   }, { ignoreInputs: true })
 
-  useAction("view.settings", () => {
+  useActiveAction("view.settings", () => {
     onOpenSettings()
   }, { ignoreInputs: true })
 
-  useAction("view.quickLook", () => {
+  useActiveAction("view.quickLook", () => {
     if (quickLookEntry) {
       closeQuickLook()
       return
@@ -445,11 +462,11 @@ export function FileExplorerProvider({
   }, { enabled: navEnabled || !!quickLookEntry, ignoreInputs: true })
 
 
-  useAction("selection.all", () => {
+  useActiveAction("selection.all", () => {
     selection.selectAll(filteredEntries.map((en) => en.path))
   }, { enabled: navEnabled, ignoreInputs: true })
 
-  useAction("selection.down", () => {
+  useActiveAction("selection.down", () => {
     if (filteredEntries.length === 0) return
     const idx = selected
       ? filteredEntries.findIndex((en) => en.path === selected)
@@ -461,7 +478,7 @@ export function FileExplorerProvider({
     }
   }, { enabled: navEnabled })
 
-  useAction("selection.up", () => {
+  useActiveAction("selection.up", () => {
     if (filteredEntries.length === 0) return
     const idx = selected
       ? filteredEntries.findIndex((en) => en.path === selected)
@@ -473,16 +490,16 @@ export function FileExplorerProvider({
     }
   }, { enabled: navEnabled })
 
-  useAction("nav.activate", () => {
+  useActiveAction("nav.activate", () => {
     if (selEntry) handleActivate(selEntry)
   }, { enabled: navEnabled && !!selEntry })
 
-  useAction("nav.up", () => {
+  useActiveAction("nav.up", () => {
     const par = parentPath(path)
     if (par) onNavigate(par)
   }, { enabled: navEnabled })
 
-  useAction("nav.enter", () => {
+  useActiveAction("nav.enter", () => {
     if (selEntry?.is_dir) onNavigate(selEntry.path)
   }, { enabled: navEnabled && !!selEntry?.is_dir })
 
