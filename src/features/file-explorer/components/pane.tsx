@@ -52,7 +52,7 @@ export function Pane({
   onPathChange,
   clipboardApi,
 }: Props) {
-  const { current, navigate, back, forward } = useHistory(initialPath)
+  const { current, navigate, back, forward, canBack, canForward } = useHistory(initialPath)
 
   useEffect(() => {
     registerNav(paneId, { current, navigate, back, forward })
@@ -69,6 +69,10 @@ export function Pane({
     <FileExplorerProvider
       path={current}
       onNavigate={navigate}
+      onBack={back}
+      onForward={forward}
+      canBack={canBack}
+      canForward={canForward}
       onOpenSearch={onOpenSearch}
       onAddFavorite={onAddFavorite}
       isFavorite={isFavoriteFn(current)}

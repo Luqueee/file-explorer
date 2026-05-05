@@ -29,7 +29,7 @@ export function ArchiveProgressPanel() {
         const verb = isCompress ? "Comprimiendo" : "Descomprimiendo"
         const percent =
           op.total > 0 ? Math.min(100, Math.round((op.current / op.total) * 100)) : 0
-        const indeterminate = op.total === -1
+        const indeterminate = op.total < 0 || op.current === 0
 
         return (
           <div

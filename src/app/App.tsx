@@ -1,4 +1,10 @@
-import { useCallback, useEffect, useRef, useState, type CSSProperties } from "react"
+import {
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+  type CSSProperties,
+} from "react"
 import { useAction } from "@/features/hotkeys/bindings"
 import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar"
 import { AppSidebar } from "@/features/sidebar/components/app-sidebar"
@@ -10,7 +16,10 @@ import { useSettings } from "@/features/settings/api/use-settings"
 import { useHomeDir } from "@/features/filesystem/api/use-directory"
 import { fsGateway } from "@/features/filesystem/infra/fs.gateway"
 import { useFavorites } from "@/features/navigation/api/use-favorites"
-import { readLastPath, writeLastPath } from "@/features/file-explorer/hooks/use-explorer-prefs"
+import {
+  readLastPath,
+  writeLastPath,
+} from "@/features/file-explorer/hooks/use-explorer-prefs"
 import { ArchiveProgressPanel } from "@/features/file-explorer/components/archive-progress-panel"
 import { useClipboard } from "@/features/filesystem/api/use-clipboard"
 import { logger } from "@/shared/lib/logger"
@@ -61,9 +70,12 @@ export default function App() {
     setPathByPane((m) => (m[id] === path ? m : { ...m, [id]: path }))
   }, [])
 
-  const navigateActive = useCallback((p: string) => {
-    navRefs.current.get(activeId)?.navigate(p)
-  }, [activeId])
+  const navigateActive = useCallback(
+    (p: string) => {
+      navRefs.current.get(activeId)?.navigate(p)
+    },
+    [activeId]
+  )
 
   const backActive = useCallback(() => {
     navRefs.current.get(activeId)?.back()
@@ -117,7 +129,9 @@ export default function App() {
     fsGateway.open(p).catch((e) => logger.error("open failed", e))
   }, [])
 
-  useAction("search.toggle", () => setSearchOpen((v) => !v), { ignoreInputs: false })
+  useAction("search.toggle", () => setSearchOpen((v) => !v), {
+    ignoreInputs: false,
+  })
   useAction("nav.back", backActive, { ignoreInputs: true })
   useAction("nav.forward", forwardActive, { ignoreInputs: true })
   useAction("view.toggleSplit", toggleSplit, { ignoreInputs: true })

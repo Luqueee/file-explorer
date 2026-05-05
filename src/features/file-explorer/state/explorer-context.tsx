@@ -266,8 +266,11 @@ export function FileExplorerProvider({
   const openContextMenu = useCallback((e: ReactMouseEvent, entry: FileEntry | null) => {
     e.preventDefault()
     e.stopPropagation()
-    // Raw click coords; ContextMenuBody measures and clamps to viewport.
-    if (entry) setSelected(entry.path)
+    if (entry) {
+      // Keep multi-selection when Ctrl is held or entry is already selected.
+      const alreadySelected = selectedPathsRef.current.has(entry.path)
+      if (!e.ctrlKey && !alreadySelected) setSelected(entry.path)
+    }
     setContextMenu({ x: e.clientX, y: e.clientY, entry })
   }, [setSelected])
 

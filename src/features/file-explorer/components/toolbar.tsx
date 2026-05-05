@@ -164,7 +164,7 @@ export function Toolbar() {
   return (
     <header
       data-tauri-drag-region
-      className="flex h-12 w-full shrink-0 items-center gap-1 border-b border-border/60 bg-background/95 px-3 backdrop-blur"
+      className="flex h-12 w-full shrink-0 items-center gap-1 border-b border-border/60 bg-background/95 pl-2 pr-3 backdrop-blur"
     >
       <SidebarTrigger className="h-8 w-8" />
       <Separator orientation="vertical" className="mx-1 h-full" />
