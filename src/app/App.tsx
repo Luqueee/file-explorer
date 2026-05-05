@@ -1,23 +1,15 @@
-import { useCallback, useEffect, useState, type CSSProperties } from "react"
+import { useCallback, useEffect, useRef, useState, type CSSProperties } from "react"
 import { useAction } from "@/features/hotkeys/bindings"
 import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar"
 import { AppSidebar } from "@/features/sidebar/components/app-sidebar"
-import { Toolbar } from "@/features/file-explorer/components/toolbar"
-import { FilterBar } from "@/features/file-explorer/components/filter-bar"
-import { FileTable } from "@/features/file-explorer/components/file-table"
-import { DeleteBar } from "@/features/file-explorer/components/delete-bar"
-import { ErrorBar } from "@/features/file-explorer/components/error-bar"
-import { StatusFooter } from "@/features/file-explorer/components/status-footer"
-import { FileContextMenu } from "@/features/file-explorer/components/context-menu"
-import { QuickLookHost } from "@/features/file-explorer/components/quick-look-host"
-import { FileExplorerProvider } from "@/features/file-explorer/state/explorer-context"
+import { Pane, type PaneNavApi } from "@/features/file-explorer/components/pane"
 import { SearchPalette } from "@/features/search/components/search-palette"
 import { SettingsPanel } from "@/features/settings/components/settings-panel"
 import { useSettings } from "@/features/settings/api/use-settings"
 import { useHomeDir } from "@/features/filesystem/api/use-directory"
 import { fsGateway } from "@/features/filesystem/infra/fs.gateway"
-import { useHistory } from "@/features/navigation/api/use-history"
 import { useFavorites } from "@/features/navigation/api/use-favorites"
+import { useClipboard } from "@/features/filesystem/api/use-clipboard"
 import { logger } from "@/shared/lib/logger"
 
 const sidebarStyle = {
@@ -25,72 +17,155 @@ const sidebarStyle = {
   "--header-height": "calc(var(--spacing) * 12)",
 } as CSSProperties
 
+interface PaneEntry {
+  id: string
+  initialPath: string
+}
+
 export default function App() {
   const homeDir = useHomeDir()
-  const { current: currentPath, navigate, back, forward } = useHistory(homeDir)
   const { favorites, add, remove, isFavorite } = useFavorites()
   const [searchOpen, setSearchOpen] = useState(false)
   const [settingsOpen, setSettingsOpen] = useState(false)
   const settings = useSettings()
+  const clipboardApi = useClipboard()
+
+  const [panes, setPanes] = useState<PaneEntry[]>([])
+  const [activeId, setActiveId] = useState<string>("")
+  const [pathByPane, setPathByPane] = useState<Record<string, string>>({})
+
+  const navRefs = useRef<Map<string, PaneNavApi>>(new Map())
+
+  useEffect(() => {
+    if (homeDir && panes.length === 0) {
+      const id = "p-1"
+      setPanes([{ id, initialPath: homeDir }])
+      setActiveId(id)
+    }
+  }, [homeDir, panes.length])
+
+  const activePath = pathByPane[activeId] ?? null
+
+  const registerNav = useCallback((id: string, api: PaneNavApi | null) => {
+    if (api) navRefs.current.set(id, api)
+    else navRefs.current.delete(id)
+  }, [])
+
+  const onPathChange = useCallback((id: string, path: string) => {
+    setPathByPane((m) => (m[id] === path ? m : { ...m, [id]: path }))
+  }, [])
+
+  const navigateActive = useCallback((p: string) => {
+    navRefs.current.get(activeId)?.navigate(p)
+  }, [activeId])
+
+  const backActive = useCallback(() => {
+    navRefs.current.get(activeId)?.back()
+  }, [activeId])
+
+  const forwardActive = useCallback(() => {
+    navRefs.current.get(activeId)?.forward()
+  }, [activeId])
+
+  const closePane = useCallback(
+    (id: string) => {
+      setPanes((ps) => {
+        if (ps.length <= 1) return ps
+        const remaining = ps.filter((p) => p.id !== id)
+        if (id === activeId) setActiveId(remaining[0].id)
+        return remaining
+      })
+      setPathByPane((m) => {
+        if (!(id in m)) return m
+        const next = { ...m }
+        delete next[id]
+        return next
+      })
+    },
+    [activeId]
+  )
+
+  const toggleSplit = useCallback(() => {
+    if (panes.length === 1) {
+      const id = `p-${Date.now()}`
+      const initial = activePath ?? homeDir ?? "/"
+      setPanes([panes[0], { id, initialPath: initial }])
+      setActiveId(id)
+    } else {
+      const inactive = panes.find((p) => p.id !== activeId)
+      if (inactive) closePane(inactive.id)
+    }
+  }, [panes, activeId, activePath, homeDir, closePane])
+
+  const nextPane = useCallback(() => {
+    if (panes.length < 2) return
+    const idx = panes.findIndex((p) => p.id === activeId)
+    setActiveId(panes[(idx + 1) % panes.length].id)
+  }, [panes, activeId])
 
   const handleOpenFile = useCallback((p: string) => {
     fsGateway.open(p).catch((e) => logger.error("open failed", e))
   }, [])
 
   useAction("search.toggle", () => setSearchOpen((v) => !v), { ignoreInputs: false })
-  useAction("nav.back", back, { ignoreInputs: true })
-  useAction("nav.forward", forward, { ignoreInputs: true })
+  useAction("nav.back", backActive, { ignoreInputs: true })
+  useAction("nav.forward", forwardActive, { ignoreInputs: true })
+  useAction("view.toggleSplit", toggleSplit, { ignoreInputs: true })
+  useAction("view.nextPane", nextPane, { ignoreInputs: true })
 
   useEffect(() => {
     function onMouseDown(e: MouseEvent) {
       if (e.button !== 3 && e.button !== 4) return
       e.preventDefault()
-      if (e.button === 3) back()
-      else forward()
+      if (e.button === 3) backActive()
+      else forwardActive()
     }
     window.addEventListener("mousedown", onMouseDown)
     return () => window.removeEventListener("mousedown", onMouseDown)
-  }, [back, forward])
+  }, [backActive, forwardActive])
+
+  const sidebarFocusPath = activePath ?? homeDir ?? "/"
 
   return (
     <>
-      {currentPath ? (
-        <FileExplorerProvider
-          path={currentPath}
-          onNavigate={navigate}
-          onOpenSearch={() => setSearchOpen(true)}
-          onAddFavorite={add}
-          isFavorite={isFavorite(currentPath)}
-          terminalId={settings.terminalId}
-          onOpenSettings={() => setSettingsOpen(true)}
+      {homeDir ? (
+        <SidebarProvider
+          className="flex h-svh w-full flex-col overflow-hidden bg-background"
+          style={sidebarStyle}
         >
-          <SidebarProvider
-            className="flex h-svh w-full flex-col overflow-hidden bg-background"
-            style={sidebarStyle}
-          >
-            <Toolbar />
-            <FilterBar />
-            <div className="flex min-h-0 w-full flex-1 flex-row">
-              <AppSidebar
-                variant="inset"
-                style={{ top: "6rem", bottom: "1.75rem", height: "auto" }}
-                homeDir={homeDir}
-                currentPath={currentPath}
-                favorites={favorites}
-                onNavigate={navigate}
-                onRemoveFavorite={remove}
-              />
-              <SidebarInset className="min-w-0 flex-1 overflow-hidden">
-                <FileTable />
-              </SidebarInset>
-            </div>
-            <DeleteBar />
-            <ErrorBar />
-            <StatusFooter />
-          </SidebarProvider>
-          <FileContextMenu />
-          <QuickLookHost />
-        </FileExplorerProvider>
+          <div className="flex min-h-0 w-full flex-1 flex-row">
+            <AppSidebar
+              variant="inset"
+              style={{ top: "6rem", bottom: "1.75rem", height: "auto" }}
+              homeDir={homeDir}
+              currentPath={sidebarFocusPath}
+              favorites={favorites}
+              onNavigate={navigateActive}
+              onRemoveFavorite={remove}
+            />
+            <SidebarInset className="flex min-w-0 flex-1 flex-row overflow-hidden">
+              {panes.map((p) => (
+                <Pane
+                  key={p.id}
+                  paneId={p.id}
+                  initialPath={p.initialPath}
+                  isActive={p.id === activeId}
+                  showActiveRing={panes.length > 1 && p.id === activeId}
+                  onActivate={() => setActiveId(p.id)}
+                  onClose={panes.length > 1 ? () => closePane(p.id) : null}
+                  isFavoriteFn={isFavorite}
+                  onAddFavorite={add}
+                  onOpenSearch={() => setSearchOpen(true)}
+                  onOpenSettings={() => setSettingsOpen(true)}
+                  terminalId={settings.terminalId}
+                  registerNav={registerNav}
+                  onPathChange={onPathChange}
+                  clipboardApi={clipboardApi}
+                />
+              ))}
+            </SidebarInset>
+          </div>
+        </SidebarProvider>
       ) : (
         <div className="flex h-svh items-center justify-center text-sm text-muted-foreground">
           Cargando...
@@ -108,10 +183,10 @@ export default function App() {
       />
 
       <SearchPalette
-        root={currentPath ?? homeDir ?? "/"}
+        root={sidebarFocusPath}
         open={searchOpen}
         onClose={() => setSearchOpen(false)}
-        onNavigate={navigate}
+        onNavigate={navigateActive}
         onOpenFile={handleOpenFile}
       />
     </>

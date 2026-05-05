@@ -35,9 +35,11 @@ export const HOTKEY_ACTIONS = [
   { id: "view.grid", label: "Vista cuadrícula", group: "Vista", defaultHotkey: "Mod+2" },
   { id: "view.reload", label: "Recargar", group: "Vista", defaultHotkey: "Mod+R" },
   { id: "view.editPath", label: "Editar ruta", group: "Vista", defaultHotkey: "Mod+L" },
-  { id: "view.terminal", label: "Abrir terminal", group: "Vista", defaultHotkey: "Mod+T" },
+  { id: "view.terminal", label: "Abrir terminal", group: "Vista", defaultHotkey: "Mod+Shift+T" },
   { id: "view.settings", label: "Abrir configuración", group: "Vista", defaultHotkey: "Mod+," },
   { id: "view.quickLook", label: "Vista previa rápida", group: "Vista", defaultHotkey: "Space" },
+  { id: "view.toggleSplit", label: "Dividir / unir paneles", group: "Vista", defaultHotkey: "Mod+T" },
+  { id: "view.nextPane", label: "Siguiente panel", group: "Vista", defaultHotkey: "Mod+`" },
 
   // Historial
   { id: "history.undo", label: "Deshacer", group: "Historial", defaultHotkey: "Mod+Z" },
