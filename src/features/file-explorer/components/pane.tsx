@@ -1,4 +1,5 @@
 import { useEffect } from "react"
+import { createPortal } from "react-dom"
 import { X } from "lucide-react"
 import { useHistory } from "@/features/navigation/api/use-history"
 import type { useClipboard } from "@/features/filesystem/api/use-clipboard"
@@ -34,6 +35,8 @@ interface Props {
   registerNav: (id: string, api: PaneNavApi | null) => void
   onPathChange: (id: string, path: string) => void
   clipboardApi: ReturnType<typeof useClipboard>
+  headerContainer: HTMLElement | null
+  filterContainer: HTMLElement | null
 }
 
 export function Pane({
@@ -51,6 +54,8 @@ export function Pane({
   registerNav,
   onPathChange,
   clipboardApi,
+  headerContainer,
+  filterContainer,
 }: Props) {
   const { current, navigate, back, forward, canBack, canForward } = useHistory(initialPath)
 
@@ -81,13 +86,20 @@ export function Pane({
       active={isActive}
       clipboardApi={clipboardApi}
     >
+      {headerContainer && createPortal(
+        <div className="min-w-0 flex-1 overflow-hidden"><Toolbar /></div>,
+        headerContainer
+      )}
+      {filterContainer && createPortal(
+        <div className="min-w-0 flex-1 overflow-hidden"><FilterBar /></div>,
+        filterContainer
+      )}
       <div
         onMouseDownCapture={onActivate}
         className={`relative flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden border-l border-border/40 first:border-l-0 ${
           showActiveRing ? "ring-1 ring-inset ring-primary/40" : ""
         }`}
       >
-        <Toolbar />
         {onClose && (
           <button
             onClick={onClose}
@@ -97,7 +109,6 @@ export function Pane({
             <X className="h-4 w-4" />
           </button>
         )}
-        <FilterBar />
         <div className="flex min-h-0 flex-1">
           <FileTable />
         </div>

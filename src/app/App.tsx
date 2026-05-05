@@ -150,6 +150,9 @@ export default function App() {
 
   const sidebarFocusPath = activePath ?? homeDir ?? "/"
 
+  const [headerEl, setHeaderEl] = useState<HTMLDivElement | null>(null)
+  const [filterEl, setFilterEl] = useState<HTMLDivElement | null>(null)
+
   return (
     <>
       {homeDir ? (
@@ -157,10 +160,12 @@ export default function App() {
           className="flex h-svh w-full flex-col overflow-hidden bg-background"
           style={sidebarStyle}
         >
+          <div ref={setHeaderEl} className="flex w-full shrink-0" />
+          <div ref={setFilterEl} className="flex w-full shrink-0" />
           <div className="flex min-h-0 w-full flex-1 flex-row">
             <AppSidebar
               variant="inset"
-              style={{ top: "6rem", bottom: "1.75rem", height: "auto" }}
+              style={{ top: "5.25rem", bottom: "1.75rem", height: "auto" }}
               homeDir={homeDir}
               currentPath={sidebarFocusPath}
               favorites={favorites}
@@ -185,6 +190,8 @@ export default function App() {
                   registerNav={registerNav}
                   onPathChange={onPathChange}
                   clipboardApi={clipboardApi}
+                  headerContainer={headerEl}
+                  filterContainer={filterEl}
                 />
               ))}
             </SidebarInset>
