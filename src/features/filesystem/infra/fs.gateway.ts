@@ -2,6 +2,12 @@ import { invoke } from "@tauri-apps/api/core"
 import type { FileEntry, SearchResult } from "../domain/file-entry"
 import type { SmbShare } from "@/features/smb/domain/share"
 
+export interface ArchiveEntry {
+  path: string
+  size: number
+  isDir: boolean
+}
+
 export interface GrepHit {
   path: string
   line_number: number
@@ -12,6 +18,8 @@ export interface GrepHit {
 
 export type SortBy = "name" | "size" | "modified"
 export type SortDir = "asc" | "desc"
+
+export type RunOutcome = "direct" | "fallback_clipboard"
 
 export type Preview =
   | { kind: "text"; mime: string; content: string; truncated: boolean }
@@ -33,6 +41,8 @@ export const fsGateway = {
     invoke<DirectoryPage>("list_directory", { path, options: options ?? null }),
   home: () => invoke<string>("get_home_dir"),
   open: (path: string) => invoke<void>("open_file", { path }),
+  reveal: (path: string) => invoke<void>("reveal_in_file_manager", { path }),
+  duplicate: (src: string) => invoke<string>("duplicate_entry", { src }),
   preview: (path: string) => invoke<Preview>("preview_file", { path }),
   grep: (
     root: string,
@@ -84,9 +94,20 @@ export const fsGateway = {
       destDir,
       archiveName: archiveName ?? null,
     }),
+  decompress: (path: string) =>
+    invoke<string>("decompress_entry", { path }),
+  cancelArchive: (opId: string) =>
+    invoke<void>("cancel_archive", { opId }),
+  listArchive: (path: string) =>
+    invoke<ArchiveEntry[]>("list_archive_entries", { path }),
   openTerminal: (path: string, terminalId?: string | null) =>
     invoke<void>("open_terminal", { path, terminalId: terminalId ?? null }),
   listTerminals: () => invoke<{ id: string; name: string }[]>("list_terminals"),
+  runInTerminal: (scriptPath: string, terminalId?: string | null) =>
+    invoke<RunOutcome>("run_in_terminal", {
+      scriptPath,
+      terminalId: terminalId ?? null,
+    }),
   smbList: () => invoke<SmbShare[]>("smb_list"),
   smbSave: (share: SmbShare, password?: string | null) =>
     invoke<SmbShare>("smb_save", { share, password: password ?? null }),

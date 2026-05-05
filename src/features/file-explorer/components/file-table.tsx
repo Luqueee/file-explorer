@@ -1,7 +1,9 @@
+import { useState, useEffect } from "react"
 import { AlertCircle, ArrowDown, ArrowUp, ArrowUpDown, FileText, Folder, FolderOpen, Loader2, Search } from "lucide-react"
 import type { SortBy } from "@/features/filesystem/infra/fs.gateway"
 import { useVirtualizer } from "@tanstack/react-virtual"
 import { Button } from "@/components/ui/button"
+import { Checkbox } from "@/components/ui/checkbox"
 import { formatSize, formatDate } from "@/shared/lib/format"
 import { useFileExplorer } from "../state/explorer-context"
 import { FileIcon } from "./file-icon"
@@ -123,6 +125,9 @@ function VirtualTable() {
     filteredEntries,
     isSelected,
     selectAt,
+    selectAll,
+    clearSelection,
+    selectedPaths,
     tableRef,
     clipboard,
     clipboardHas,
@@ -139,6 +144,19 @@ function VirtualTable() {
     setSortBy,
     setSortDir,
   } = useFileExplorer()
+
+  const [checkboxMode, setCheckboxMode] = useState(false)
+
+  const size = selectedPaths.size
+  useEffect(() => {
+    if (size === 0) setCheckboxMode(false)
+  }, [size])
+
+  // Show row checkboxes only when header checkbox was used or multiple items are selected
+  const showCheckboxes = checkboxMode || size > 1
+
+  const allSelected = size > 0 && size >= filteredEntries.length
+  const someSelected = size > 0 && size < filteredEntries.length
 
   const handleSort = (col: SortBy) => {
     if (sortBy === col) {
@@ -166,6 +184,22 @@ function VirtualTable() {
     <table className="w-full text-sm" role="grid" aria-multiselectable="true">
       <thead className="sticky top-0 z-10 bg-background/95 backdrop-blur">
         <tr className="border-b border-border/60">
+          <th className="w-10 px-3 py-2 text-center">
+            <Checkbox
+              checked={allSelected ? true : someSelected ? "indeterminate" : false}
+              onCheckedChange={(checked) => {
+                if (checked) {
+                  selectAll()
+                  setCheckboxMode(true)
+                } else {
+                  clearSelection()
+                  setCheckboxMode(false)
+                }
+              }}
+              aria-label="Seleccionar todo"
+              className="shadow-none"
+            />
+          </th>
           <th className="px-4 py-2 text-left">
             <SortHeader
               column="name"
@@ -201,6 +235,7 @@ function VirtualTable() {
       <tbody>
         {inlineMode === "newFolder" && (
           <tr className="border-b border-border/30 bg-accent/30">
+            <td className="w-10 px-3 py-2" />
             <td className="flex min-w-0 items-center gap-2.5 px-4 py-2">
               <Folder className="h-4 w-4 shrink-0 fill-blue-400/30 text-blue-400" />
               <InlineEditInput
@@ -218,6 +253,7 @@ function VirtualTable() {
 
         {inlineMode === "newFile" && (
           <tr className="border-b border-border/30 bg-accent/30">
+            <td className="w-10 px-3 py-2" />
             <td className="flex min-w-0 items-center gap-2.5 px-4 py-2">
               <FileText className="h-4 w-4 shrink-0 text-muted-foreground" />
               <InlineEditInput
@@ -235,7 +271,7 @@ function VirtualTable() {
 
         {paddingTop > 0 && (
           <tr aria-hidden style={{ height: paddingTop }}>
-            <td colSpan={3} />
+            <td colSpan={4} />
           </tr>
         )}
 
@@ -258,6 +294,21 @@ function VirtualTable() {
               onDoubleClick={() => !isRenaming && handleActivate(entry)}
               onContextMenu={(e) => openContextMenu(e, entry)}
             >
+              <td
+                className="w-10 px-3 py-2 text-center"
+                onClick={(e) => e.stopPropagation()}
+              >
+                <Checkbox
+                  checked={selectedRow}
+                  onCheckedChange={() =>
+                    selectAt(entry.path, { shiftKey: false, metaKey: true, ctrlKey: false })
+                  }
+                  aria-label={`Seleccionar ${entry.name}`}
+                  className={`shadow-none transition-opacity duration-150 ${
+                    showCheckboxes ? "opacity-100" : "opacity-0 pointer-events-none"
+                  }`}
+                />
+              </td>
               <td className="flex min-w-0 items-center gap-2.5 px-4 py-2">
                 <FileIcon
                   name={entry.name}
@@ -288,7 +339,7 @@ function VirtualTable() {
 
         {paddingBottom > 0 && (
           <tr aria-hidden style={{ height: paddingBottom }}>
-            <td colSpan={3} />
+            <td colSpan={4} />
           </tr>
         )}
       </tbody>

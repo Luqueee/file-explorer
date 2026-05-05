@@ -1,14 +1,26 @@
-import { useCallback, useEffect, useRef, useState, type CSSProperties } from "react"
+import {
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+  type CSSProperties,
+} from "react"
 import { useAction } from "@/features/hotkeys/bindings"
 import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar"
 import { AppSidebar } from "@/features/sidebar/components/app-sidebar"
 import { Pane, type PaneNavApi } from "@/features/file-explorer/components/pane"
 import { SearchPalette } from "@/features/search/components/search-palette"
 import { SettingsPanel } from "@/features/settings/components/settings-panel"
+import { Toaster } from "@/components/ui/sonner"
 import { useSettings } from "@/features/settings/api/use-settings"
 import { useHomeDir } from "@/features/filesystem/api/use-directory"
 import { fsGateway } from "@/features/filesystem/infra/fs.gateway"
 import { useFavorites } from "@/features/navigation/api/use-favorites"
+import {
+  readLastPath,
+  writeLastPath,
+} from "@/features/file-explorer/hooks/use-explorer-prefs"
+import { ArchiveProgressPanel } from "@/features/file-explorer/components/archive-progress-panel"
 import { useClipboard } from "@/features/filesystem/api/use-clipboard"
 import { logger } from "@/shared/lib/logger"
 
@@ -39,8 +51,11 @@ export default function App() {
   useEffect(() => {
     if (homeDir && panes.length === 0) {
       const id = "p-1"
-      setPanes([{ id, initialPath: homeDir }])
+      // One-time initialization from async homeDir — cascading render is intentional.
+      /* eslint-disable react-hooks/set-state-in-effect */
+      setPanes([{ id, initialPath: readLastPath() ?? homeDir }])
       setActiveId(id)
+      /* eslint-enable react-hooks/set-state-in-effect */
     }
   }, [homeDir, panes.length])
 
@@ -55,9 +70,12 @@ export default function App() {
     setPathByPane((m) => (m[id] === path ? m : { ...m, [id]: path }))
   }, [])
 
-  const navigateActive = useCallback((p: string) => {
-    navRefs.current.get(activeId)?.navigate(p)
-  }, [activeId])
+  const navigateActive = useCallback(
+    (p: string) => {
+      navRefs.current.get(activeId)?.navigate(p)
+    },
+    [activeId]
+  )
 
   const backActive = useCallback(() => {
     navRefs.current.get(activeId)?.back()
@@ -103,11 +121,17 @@ export default function App() {
     setActiveId(panes[(idx + 1) % panes.length].id)
   }, [panes, activeId])
 
+  useEffect(() => {
+    if (activePath) writeLastPath(activePath)
+  }, [activePath])
+
   const handleOpenFile = useCallback((p: string) => {
     fsGateway.open(p).catch((e) => logger.error("open failed", e))
   }, [])
 
-  useAction("search.toggle", () => setSearchOpen((v) => !v), { ignoreInputs: false })
+  useAction("search.toggle", () => setSearchOpen((v) => !v), {
+    ignoreInputs: false,
+  })
   useAction("nav.back", backActive, { ignoreInputs: true })
   useAction("nav.forward", forwardActive, { ignoreInputs: true })
   useAction("view.toggleSplit", toggleSplit, { ignoreInputs: true })
@@ -189,6 +213,9 @@ export default function App() {
         onNavigate={navigateActive}
         onOpenFile={handleOpenFile}
       />
+
+      <ArchiveProgressPanel />
+      <Toaster position="bottom-right" richColors closeButton />
     </>
   )
 }

@@ -7,7 +7,7 @@ export function FilterBar() {
   if (!filterQuery && entries.length === 0) return null
 
   return (
-    <div className="flex h-9 w-full shrink-0 items-center gap-2 border-b border-border/40 bg-muted/10 px-4">
+    <div className="flex h-9 w-full shrink-0 items-center gap-2 border-b border-border/40 bg-muted/10 pl-2 pr-4">
       <Search className="h-3.5 w-3.5 shrink-0 text-muted-foreground/60" />
       <input
         ref={filterRef}

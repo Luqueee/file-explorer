@@ -14,8 +14,10 @@ import { useHotkey, type UseHotkeyOptions } from "@tanstack/react-hotkeys"
 import { useAction } from "@/features/hotkeys/bindings"
 import type { HotkeyActionId } from "@/features/hotkeys/registry"
 import { DndContext, DragOverlay } from "@dnd-kit/core"
+import { toast } from "sonner"
 import { useDirectory } from "@/features/filesystem/api/use-directory"
-import type { SortBy, SortDir } from "@/features/filesystem/infra/fs.gateway"
+import { fsGateway, type SortBy, type SortDir } from "@/features/filesystem/infra/fs.gateway"
+import { fsErrorMessage } from "@/features/filesystem/domain/fs-error"
 import { useFileOps } from "@/features/filesystem/api/use-file-ops"
 import { useClipboard } from "@/features/filesystem/api/use-clipboard"
 
@@ -26,11 +28,13 @@ import {
   type PathSegment,
 } from "@/features/filesystem/domain/path"
 import type { FileEntry } from "@/features/filesystem/domain/file-entry"
+import { isShellScript } from "@/features/filesystem/domain/file-entry"
 import { isMacJunk } from "@/features/filesystem/domain/mac-junk"
 import type { Clipboard } from "@/features/filesystem/domain/clipboard"
 import type { ContextMenuState } from "../types"
 import { FileIcon } from "../components/file-icon"
 import { useViewMode, type ViewMode } from "../hooks/use-view-mode"
+import { useSortPref, useShowHidden } from "../hooks/use-explorer-prefs"
 import { useInlineEditing, type InlineMode } from "../hooks/use-inline-editing"
 import { useDragDrop } from "../hooks/use-drag-drop"
 import { useSelection, modeFromEvent } from "../hooks/use-selection"
@@ -42,6 +46,10 @@ export type { InlineMode, ViewMode }
 interface Value {
   path: string
   onNavigate: (path: string) => void
+  onBack: () => void
+  onForward: () => void
+  canBack: boolean
+  canForward: boolean
   onOpenSearch: () => void
   onAddFavorite: (path: string) => void
   isFavorite: boolean
@@ -112,11 +120,20 @@ interface Value {
   handleActivate: (entry: FileEntry) => void
   handlePaste: () => Promise<void>
   compress: (paths: string[]) => Promise<void>
+  decompress: (path: string) => Promise<void>
+  duplicate: (path: string) => Promise<void>
+  reveal: (path: string) => void
+  copyPathToClipboard: (path: string) => Promise<void>
+  runInTerminal: (path: string) => Promise<void>
 
   sortBy: SortBy
   sortDir: SortDir
   setSortBy: (s: SortBy) => void
   setSortDir: (d: SortDir) => void
+
+  showHidden: boolean
+  setShowHidden: (v: boolean) => void
+
 
   quickLookEntry: FileEntry | null
   openQuickLook: (entry: FileEntry) => void
@@ -138,6 +155,10 @@ export function useFileExplorer(): Value {
 interface ProviderProps {
   path: string
   onNavigate: (path: string) => void
+  onBack: () => void
+  onForward: () => void
+  canBack: boolean
+  canForward: boolean
   onOpenSearch: () => void
   onAddFavorite: (path: string) => void
   isFavorite: boolean
@@ -151,6 +172,10 @@ interface ProviderProps {
 export function FileExplorerProvider({
   path,
   onNavigate,
+  onBack,
+  onForward,
+  canBack,
+  canForward,
   onOpenSearch,
   onAddFavorite,
   isFavorite,
@@ -160,10 +185,11 @@ export function FileExplorerProvider({
   clipboardApi,
   children,
 }: ProviderProps) {
+  const { sortBy, sortDir, setSortBy, setSortDir } = useSortPref()
+  const { showHidden, setShowHidden } = useShowHidden()
   const {
     entries, loading, error, reload, total, hasMore, loadMore, setEntriesFromPage,
-    sortBy, sortDir, setSortBy, setSortDir,
-  } = useDirectory(path)
+  } = useDirectory(path, sortBy, sortDir)
   const localClipboard = useClipboard()
   const { clipboard, copy, cut, clear: clearClipboard, hasPath: clipboardHas } =
     clipboardApi ?? localClipboard
@@ -179,19 +205,31 @@ export function FileExplorerProvider({
 
   const { viewMode, setViewMode } = useViewMode()
   const inline = useInlineEditing(path, entries, ops)
-  const dnd = useDragDrop(ops)
+
+  // Refs let callbacks always see latest data without being in deps → stable references.
+  const entriesRef = useRef<readonly FileEntry[]>(entries)
+  const selectedPathsRef = useRef<ReadonlySet<string>>(selection.selectedPaths)
+
+  const dnd = useDragDrop(ops, selectedPathsRef, entriesRef)
 
   const tableRef = useRef<HTMLDivElement | null>(null)
   const filterRef = useRef<HTMLInputElement | null>(null)
 
   useEffect(() => {
+    /* eslint-disable react-hooks/set-state-in-effect */
     setSelected(null)
     setFilterQuery("")
-  }, [path])
+    /* eslint-enable react-hooks/set-state-in-effect */
+  }, [path, setSelected])
 
   const visibleEntries = useMemo(
-    () => entries.filter((e) => !isMacJunk(e.name)),
-    [entries]
+    () =>
+      entries.filter((e) => {
+        if (isMacJunk(e.name)) return false
+        if (!showHidden && e.name.startsWith(".")) return false
+        return true
+      }),
+    [entries, showHidden]
   )
 
   const filteredEntries = useMemo(() => {
@@ -200,23 +238,25 @@ export function FileExplorerProvider({
     return visibleEntries.filter((e) => e.name.toLowerCase().includes(q))
   }, [visibleEntries, filterQuery])
 
+  // Destructured to keep effect deps as primitives (pendingSelect) and a stable
+  // callback (clearPendingSelect), avoiding the whole `inline` object as a dep.
+  const { pendingSelect, clearPendingSelect } = inline
   useEffect(() => {
-    if (!inline.pendingSelect || entries.length === 0) return
-    const entry = entries.find((e) => e.name === inline.pendingSelect)
+    if (!pendingSelect || entries.length === 0) return
+    const entry = entries.find((e) => e.name === pendingSelect)
     if (entry) {
-      inline.clearPendingSelect()
+      clearPendingSelect()
       setSelected(entry.path)
       tableRef.current
         ?.querySelector<HTMLElement>(`[data-path="${CSS.escape(entry.path)}"]`)
         ?.scrollIntoView({ block: "nearest" })
     }
-  }, [entries, inline.pendingSelect, inline.clearPendingSelect, inline])
+  }, [entries, pendingSelect, clearPendingSelect, setSelected])
 
-  // Refs let callbacks always see latest data without being in deps → stable references.
   const filteredEntriesRef = useRef(filteredEntries)
-  const entriesRef = useRef(entries)
   useEffect(() => { filteredEntriesRef.current = filteredEntries }, [filteredEntries])
   useEffect(() => { entriesRef.current = entries }, [entries])
+  useEffect(() => { selectedPathsRef.current = selection.selectedPaths }, [selection.selectedPaths])
 
   const handleActivate = useCallback((entry: FileEntry) => {
     if (entry.is_dir) onNavigate(entry.path)
@@ -226,10 +266,12 @@ export function FileExplorerProvider({
   const openContextMenu = useCallback((e: ReactMouseEvent, entry: FileEntry | null) => {
     e.preventDefault()
     e.stopPropagation()
-    const x = Math.min(e.clientX, window.innerWidth - 210)
-    const y = Math.min(e.clientY, window.innerHeight - 240)
-    if (entry) setSelected(entry.path)
-    setContextMenu({ x, y, entry })
+    if (entry) {
+      // Keep multi-selection when Ctrl is held or entry is already selected.
+      const alreadySelected = selectedPathsRef.current.has(entry.path)
+      if (!e.ctrlKey && !alreadySelected) setSelected(entry.path)
+    }
+    setContextMenu({ x: e.clientX, y: e.clientY, entry })
   }, [setSelected])
 
   const closeContextMenu = useCallback(() => setContextMenu(null), [])
@@ -244,6 +286,46 @@ export function FileExplorerProvider({
     if (paths.length === 0) return
     await ops.compress(paths, path)
   }, [ops, path])
+
+  const decompress = useCallback(async (p: string) => {
+    try {
+      await fsGateway.decompress(p)
+      reload()
+    } catch (e) {
+      toast.error(fsErrorMessage(e))
+    }
+  }, [reload])
+
+  const duplicate = useCallback(async (p: string) => {
+    await ops.duplicate(p)
+  }, [ops])
+
+  const reveal = useCallback((p: string) => {
+    ops.reveal(p)
+  }, [ops])
+
+  const copyPathToClipboard = useCallback(async (p: string) => {
+    try {
+      await navigator.clipboard.writeText(p)
+      toast.success("Ruta copiada")
+    } catch {
+      // Clipboard API unavailable; not critical.
+    }
+  }, [])
+
+  const runInTerminal = useCallback(async (p: string) => {
+    try {
+      const outcome = await fsGateway.runInTerminal(p, terminalId)
+      if (outcome === "fallback_clipboard") {
+        toast.info("Comando copiado al portapapeles", {
+          description:
+            "Tu terminal no soporta ejecución directa. Pegá y presioná Enter.",
+        })
+      }
+    } catch (e) {
+      toast.error("No se pudo ejecutar", { description: fsErrorMessage(e) })
+    }
+  }, [terminalId])
 
   const [quickLookEntry, setQuickLookEntry] = useState<FileEntry | null>(null)
   const openQuickLook = useCallback((e: FileEntry) => setQuickLookEntry(e), [])
@@ -325,6 +407,26 @@ export function FileExplorerProvider({
     if (sel.length > 0) setDeleteTargets(sel)
   }, { enabled: navEnabled && !!selEntry })
 
+  useAction("file.duplicate", () => {
+    const sel = selectedEntries()
+    for (const entry of sel) duplicate(entry.path)
+  }, { enabled: navEnabled && !!selEntry, ignoreInputs: true })
+
+  useAction("file.copyPath", () => {
+    if (selEntry) copyPathToClipboard(selEntry.path)
+  }, { enabled: navEnabled && !!selEntry, ignoreInputs: true })
+
+  useAction("file.reveal", () => {
+    if (selEntry) reveal(selEntry.path)
+  }, { enabled: navEnabled && !!selEntry, ignoreInputs: true })
+
+  useAction("file.runInTerminal", () => {
+    if (selEntry && isShellScript(selEntry)) runInTerminal(selEntry.path)
+  }, {
+    enabled: navEnabled && !!selEntry && (selEntry ? isShellScript(selEntry) : false),
+    ignoreInputs: true,
+  })
+
   useActiveAction("file.newFile", () => {
     inline.startNewFile()
   }, { enabled: navEnabled, ignoreInputs: true })
@@ -361,6 +463,7 @@ export function FileExplorerProvider({
     }
     if (selEntry && !selEntry.is_dir) openQuickLook(selEntry)
   }, { enabled: navEnabled || !!quickLookEntry, ignoreInputs: true })
+
 
   useActiveAction("selection.all", () => {
     selection.selectAll(filteredEntries.map((en) => en.path))
@@ -425,6 +528,10 @@ export function FileExplorerProvider({
   const value = useMemo((): Value => ({
     path,
     onNavigate,
+    onBack,
+    onForward,
+    canBack,
+    canForward,
     onOpenSearch,
     onAddFavorite,
     isFavorite,
@@ -482,10 +589,17 @@ export function FileExplorerProvider({
     handleActivate,
     handlePaste,
     compress,
+    decompress,
+    duplicate,
+    reveal,
+    copyPathToClipboard,
+    runInTerminal,
     sortBy,
     sortDir,
     setSortBy,
     setSortDir,
+    showHidden,
+    setShowHidden,
     quickLookEntry,
     openQuickLook,
     closeQuickLook,
@@ -493,7 +607,8 @@ export function FileExplorerProvider({
     undoLabel: undoStack.peek ? describeUndoOp(undoStack.peek) : null,
     undo,
   }), [
-    path, onNavigate, onOpenSearch, onAddFavorite, isFavorite,
+    path, onNavigate, onBack, onForward, canBack, canForward,
+    onOpenSearch, onAddFavorite, isFavorite,
     entries, filteredEntries, loading, error, reload, total, hasMore, loadMore,
     selected, setSelected, selection, selectAt, selectAll,
     filterQuery, setFilterQuery, clipboard, copy, cut,
@@ -505,8 +620,9 @@ export function FileExplorerProvider({
     deleteTargets, setDeleteTargets, confirmDelete, clipboardHas,
     dnd.draggingEntry, dnd.copyMode, viewMode, setViewMode,
     terminalId, onOpenSettings, segments, parent, dirCount, fileCount,
-    handleActivate, handlePaste, compress,
+    handleActivate, handlePaste, compress, decompress, duplicate, reveal, copyPathToClipboard, runInTerminal,
     sortBy, sortDir, setSortBy, setSortDir,
+    showHidden, setShowHidden,
     quickLookEntry, openQuickLook, closeQuickLook,
     undoStack.canUndo, undoStack.peek, undo,
   ])
