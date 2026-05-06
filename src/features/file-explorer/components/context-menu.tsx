@@ -544,6 +544,7 @@ function ContextMenuBody({
             <MenuItem
               icon={<FolderPlus className="h-3.5 w-3.5" />}
               label="Nueva carpeta"
+              shortcut="⌘⇧N"
               onClick={() => {
                 startNewFolder()
                 closeContextMenu()
@@ -552,6 +553,7 @@ function ContextMenuBody({
             <MenuItem
               icon={<FilePlus className="h-3.5 w-3.5" />}
               label="Nuevo archivo"
+              shortcut="⌘N"
               onClick={() => {
                 startNewFile()
                 closeContextMenu()

@@ -747,23 +747,33 @@ export function FileExplorerProvider({
       >
         {children}
         <DragOverlay>
-          {dnd.draggingEntry && (
-            <div className="flex w-fit items-center gap-2 rounded-md border border-border bg-popover px-3 py-1.5 text-sm shadow-lg">
-              <FileIcon
-                name={dnd.draggingEntry.name}
-                isDir={dnd.draggingEntry.is_dir}
-                extension={dnd.draggingEntry.extension}
-              />
-              <span className="max-w-48 truncate">
-                {dnd.draggingEntry.name}
-              </span>
-              {dnd.copyMode && (
-                <span className="ml-1 rounded bg-primary/20 px-1.5 py-0.5 text-[10px] font-medium text-primary">
-                  Copiar
+          {dnd.draggingEntry && (() => {
+            const sel = selectedPathsRef.current
+            const isMulti = sel.size > 1 && sel.has(dnd.draggingEntry.path)
+            const count = isMulti ? sel.size : 1
+            return (
+              <div className="relative flex w-fit items-center gap-2 rounded-md border border-border bg-popover px-3 py-1.5 text-sm shadow-lg">
+                <FileIcon
+                  name={dnd.draggingEntry.name}
+                  isDir={dnd.draggingEntry.is_dir}
+                  extension={dnd.draggingEntry.extension}
+                />
+                <span className="max-w-48 truncate">
+                  {isMulti ? `${count} elementos` : dnd.draggingEntry.name}
                 </span>
-              )}
-            </div>
-          )}
+                {dnd.copyMode && (
+                  <span className="ml-1 rounded bg-primary/20 px-1.5 py-0.5 text-[10px] font-medium text-primary">
+                    Copiar
+                  </span>
+                )}
+                {isMulti && (
+                  <span className="absolute -right-2 -top-2 flex h-5 w-5 items-center justify-center rounded-full bg-primary text-[10px] font-bold text-primary-foreground">
+                    {count}
+                  </span>
+                )}
+              </div>
+            )
+          })()}
         </DragOverlay>
       </DndContext>
       {hashPanelEntry && (
