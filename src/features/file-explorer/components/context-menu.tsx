@@ -16,9 +16,13 @@ import {
   Trash2,
   Archive,
   PackageOpen,
+  ChevronRight,
 } from "lucide-react"
 import { useFileExplorer } from "../state/explorer-context"
-import { isShellScript, isArchive } from "@/features/filesystem/domain/file-entry"
+import {
+  isShellScript,
+  isArchive,
+} from "@/features/filesystem/domain/file-entry"
 import { TagPickerPortal } from "@/features/tags/components/tag-picker"
 
 interface MenuItemProps {
@@ -62,6 +66,99 @@ function MenuItem({
 
 function MenuDivider() {
   return <div className="my-1 border-t border-border/60" />
+}
+
+const COMPRESS_FORMATS = [
+  { label: "ZIP", ext: ".zip", fmt: "zip" },
+  { label: "TAR + ZSTD", ext: ".tar.zst", fmt: "tar.zst" },
+  { label: "TAR + GZip", ext: ".tar.gz", fmt: "tar.gz" },
+  { label: "TAR + BZip2", ext: ".tar.bz2", fmt: "tar.bz2" },
+] as const
+
+const COMPRESS_LEVELS = [
+  { label: "Rápido", value: "fast" },
+  { label: "Normal", value: "normal" },
+  { label: "Máximo", value: "best" },
+] as const
+
+function CompressFormatMenu({
+  x,
+  y,
+  onSelect,
+  onClose,
+}: {
+  x: number
+  y: number
+  onSelect: (fmt: string, level: string) => void
+  onClose: () => void
+}) {
+  return createPortal(
+    <>
+      <div
+        className="fixed inset-0 z-50"
+        onClick={onClose}
+        onContextMenu={(e) => {
+          e.preventDefault()
+          onClose()
+        }}
+      />
+      <div
+        role="menu"
+        aria-label="Formato de compresión"
+        className="fixed z-50 overflow-hidden rounded-lg border border-border/80 bg-popover shadow-xl"
+        style={{ left: x, top: y, minWidth: 280 }}
+      >
+        {/* Header */}
+        <div className="flex items-center border-b border-border/60 px-3 py-1.5">
+          <span className="flex-1 text-[11px] font-medium tracking-wide text-muted-foreground uppercase">
+            Formato
+          </span>
+          {COMPRESS_LEVELS.map(({ label, value }) => (
+            <span
+              key={value}
+              className="w-16 text-center text-[11px] font-medium tracking-wide text-muted-foreground uppercase"
+            >
+              {label}
+            </span>
+          ))}
+        </div>
+        {COMPRESS_FORMATS.map(({ label, ext, fmt }) => (
+          <div key={fmt} className="flex items-center hover:bg-accent/50">
+            <div className="flex flex-1 items-center gap-2 px-3 py-2">
+              <Archive className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+              <span className="text-sm">{label}</span>
+              <span className="text-[11px] text-muted-foreground">{ext}</span>
+            </div>
+            {COMPRESS_LEVELS.map(({ value }) => (
+              <button
+                key={value}
+                role="menuitem"
+                onClick={() => onSelect(fmt, value)}
+                className="flex h-full w-16 items-center justify-center py-2 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+                aria-label={`${label} ${value}`}
+              >
+                <span
+                  className={`h-2 w-2 rounded-full ${
+                    value === "fast"
+                      ? "bg-green-500"
+                      : value === "normal"
+                        ? "bg-yellow-500"
+                        : "bg-red-500"
+                  }`}
+                />
+              </button>
+            ))}
+          </div>
+        ))}
+        <div className="border-t border-border/60 px-3 py-1.5">
+          <p className="text-[10px] text-muted-foreground">
+            🟢 Rápido · 🟡 Normal · 🔴 Máximo ratio
+          </p>
+        </div>
+      </div>
+    </>,
+    document.body
+  )
 }
 
 export function FileContextMenu() {
@@ -167,7 +264,14 @@ function ContextMenuBody({
   // Measure the menu after first render and reposition if it overflows the viewport.
   const menuRef = useRef<HTMLDivElement | null>(null)
   const [pos, setPos] = useState({ x: contextMenu.x, y: contextMenu.y })
-  const [tagPickerPos, setTagPickerPos] = useState<{ x: number; y: number } | null>(null)
+  const [tagPickerPos, setTagPickerPos] = useState<{
+    x: number
+    y: number
+  } | null>(null)
+  const [compressMenuPos, setCompressMenuPos] = useState<{
+    x: number
+    y: number
+  } | null>(null)
   useLayoutEffect(() => {
     const el = menuRef.current
     if (!el) return
@@ -292,14 +396,30 @@ function ContextMenuBody({
               }}
             />
             <MenuDivider />
-            <MenuItem
-              icon={<Archive className="h-3.5 w-3.5" />}
-              label="Comprimir (.tar.zst)"
-              onClick={() => {
-                compress(targetPaths)
-                closeContextMenu()
+            <button
+              role="menuitem"
+              onClick={(e) => {
+                const rect = (
+                  e.currentTarget as HTMLButtonElement
+                ).getBoundingClientRect()
+                const SUBMENU_W = 296
+                const spaceRight = window.innerWidth - (pos.x + 220)
+                const x =
+                  spaceRight >= SUBMENU_W
+                    ? pos.x + 220
+                    : rect.left - SUBMENU_W - 80
+                setCompressMenuPos(
+                  compressMenuPos ? null : { x, y: rect.top - 52 }
+                )
               }}
-            />
+              className="flex w-full items-center gap-2.5 px-3 py-1.5 text-left text-sm hover:bg-accent"
+            >
+              <span className="flex h-4 w-4 items-center justify-center text-muted-foreground">
+                <Archive className="h-3.5 w-3.5" />
+              </span>
+              <span className="flex-1">Comprimir como…</span>
+              <ChevronRight className="h-3.5 w-3.5 text-muted-foreground" />
+            </button>
             {entry && isArchive(entry) && (
               <MenuItem
                 icon={<PackageOpen className="h-3.5 w-3.5" />}
@@ -365,7 +485,21 @@ function ContextMenuBody({
           paths={targetPaths}
           x={tagPickerPos.x}
           y={tagPickerPos.y}
-          onClose={() => { setTagPickerPos(null); closeContextMenu() }}
+          onClose={() => {
+            setTagPickerPos(null)
+            closeContextMenu()
+          }}
+        />
+      )}
+      {compressMenuPos && (
+        <CompressFormatMenu
+          x={compressMenuPos.x}
+          y={compressMenuPos.y}
+          onSelect={(fmt, level) => {
+            compress(targetPaths, fmt, level)
+            closeContextMenu()
+          }}
+          onClose={() => setCompressMenuPos(null)}
         />
       )}
     </>,

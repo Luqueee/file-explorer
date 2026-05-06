@@ -10,6 +10,8 @@ interface ArchiveProgressEvent {
   label: string
   done: boolean
   output: string | null
+  bytesProcessed: number
+  totalBytes: number
 }
 
 export function useArchiveProgress() {
@@ -19,7 +21,7 @@ export function useArchiveProgress() {
     const unlistenPromise = listen<ArchiveProgressEvent>(
       "archive://progress",
       ({ payload }) => {
-        const { id, operation, current, total, label, done, output } = payload
+        const { id, operation, current, total, label, done, output, bytesProcessed, totalBytes } = payload
         const isCompress = operation === "compress"
         const verb = isCompress ? "Comprimiendo" : "Descomprimiendo"
         const pastVerb = isCompress ? "Comprimido" : "Descomprimido"
@@ -33,11 +35,16 @@ export function useArchiveProgress() {
           return
         }
 
+        const pct = totalBytes > 0 ? Math.round((bytesProcessed / totalBytes) * 100) : null
         const description =
           label
-            ? total > 0
+            ? pct != null
+              ? `${label} — ${pct}%`
+              : total > 0
               ? `${label} (${current}/${total})`
               : label
+            : pct != null
+            ? `${pct}%`
             : undefined
 
         if (!toastIds.has(id)) {

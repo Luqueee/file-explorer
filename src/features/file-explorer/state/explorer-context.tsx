@@ -14,7 +14,11 @@ import { DndContext, DragOverlay } from "@dnd-kit/core"
 import { toast } from "sonner"
 import { useDirectory } from "@/features/filesystem/api/use-directory"
 import { useDirWatcher } from "@/features/filesystem/api/use-dir-watcher"
-import { fsGateway, type SortBy, type SortDir } from "@/features/filesystem/infra/fs.gateway"
+import {
+  fsGateway,
+  type SortBy,
+  type SortDir,
+} from "@/features/filesystem/infra/fs.gateway"
 import { fsErrorMessage } from "@/features/filesystem/domain/fs-error"
 import { useFileOps } from "@/features/filesystem/api/use-file-ops"
 import { useClipboard } from "@/features/filesystem/api/use-clipboard"
@@ -66,7 +70,10 @@ interface Value {
   setSelected: (p: string | null) => void
   selectedPaths: ReadonlySet<string>
   isSelected: (path: string) => boolean
-  selectAt: (path: string, e: { shiftKey: boolean; metaKey: boolean; ctrlKey: boolean }) => void
+  selectAt: (
+    path: string,
+    e: { shiftKey: boolean; metaKey: boolean; ctrlKey: boolean }
+  ) => void
   selectAll: () => void
   clearSelection: () => void
 
@@ -118,7 +125,7 @@ interface Value {
 
   handleActivate: (entry: FileEntry) => void
   handlePaste: () => Promise<void>
-  compress: (paths: string[]) => Promise<void>
+  compress: (paths: string[], format?: string, level?: string) => Promise<void>
   decompress: (path: string) => Promise<void>
   duplicate: (path: string) => Promise<void>
   reveal: (path: string) => void
@@ -148,7 +155,8 @@ const Ctx = createContext<Value | null>(null)
 
 export function useFileExplorer(): Value {
   const v = useContext(Ctx)
-  if (!v) throw new Error("useFileExplorer must be used inside FileExplorerProvider")
+  if (!v)
+    throw new Error("useFileExplorer must be used inside FileExplorerProvider")
   return v
 }
 
@@ -195,17 +203,32 @@ export function FileExplorerProvider({
       /* eslint-enable react-hooks/set-state-in-effect */
       return
     }
-    tagsGateway.getEntriesByTag(tagFilter).then(setTaggedEntries).catch(() => setTaggedEntries([]))
+    tagsGateway
+      .getEntriesByTag(tagFilter)
+      .then(setTaggedEntries)
+      .catch(() => setTaggedEntries([]))
   }, [tagFilter])
 
   const { sortBy, sortDir, setSortBy, setSortDir } = useSortPref()
   const { showHidden, setShowHidden } = useShowHidden()
   const {
-    entries, loading, error, reload, total, hasMore, loadMore, setEntriesFromPage,
+    entries,
+    loading,
+    error,
+    reload,
+    total,
+    hasMore,
+    loadMore,
+    setEntriesFromPage,
   } = useDirectory(path, sortBy, sortDir)
   const localClipboard = useClipboard()
-  const { clipboard, copy, cut, clear: clearClipboard, hasPath: clipboardHas } =
-    clipboardApi ?? localClipboard
+  const {
+    clipboard,
+    copy,
+    cut,
+    clear: clearClipboard,
+    hasPath: clipboardHas,
+  } = clipboardApi ?? localClipboard
   const undoStack = useUndoStack()
   const ops = useFileOps(reload, undoStack, setEntriesFromPage)
 
@@ -270,24 +293,36 @@ export function FileExplorerProvider({
   }, [entries, pendingSelect, clearPendingSelect, setSelected])
 
   const filteredEntriesRef = useRef(filteredEntries)
-  useEffect(() => { filteredEntriesRef.current = filteredEntries }, [filteredEntries])
-  useEffect(() => { entriesRef.current = entries }, [entries])
-  useEffect(() => { selectedPathsRef.current = selection.selectedPaths }, [selection.selectedPaths])
+  useEffect(() => {
+    filteredEntriesRef.current = filteredEntries
+  }, [filteredEntries])
+  useEffect(() => {
+    entriesRef.current = entries
+  }, [entries])
+  useEffect(() => {
+    selectedPathsRef.current = selection.selectedPaths
+  }, [selection.selectedPaths])
 
-  const handleActivate = useCallback((entry: FileEntry) => {
-    if (entry.is_dir) onNavigate(entry.path)
-    else ops.open(entry.path)
-  }, [onNavigate, ops])
+  const handleActivate = useCallback(
+    (entry: FileEntry) => {
+      if (entry.is_dir) onNavigate(entry.path)
+      else ops.open(entry.path)
+    },
+    [onNavigate, ops]
+  )
 
-  const openContextMenu = useCallback((e: ReactMouseEvent, entry: FileEntry | null) => {
-    e.preventDefault()
-    e.stopPropagation()
-    if (entry) {
-      const alreadySelected = selectedPathsRef.current.has(entry.path)
-      if (!e.ctrlKey && !alreadySelected) setSelected(entry.path)
-    }
-    setContextMenu({ x: e.clientX, y: e.clientY, entry })
-  }, [setSelected])
+  const openContextMenu = useCallback(
+    (e: ReactMouseEvent, entry: FileEntry | null) => {
+      e.preventDefault()
+      e.stopPropagation()
+      if (entry) {
+        const alreadySelected = selectedPathsRef.current.has(entry.path)
+        if (!e.ctrlKey && !alreadySelected) setSelected(entry.path)
+      }
+      setContextMenu({ x: e.clientX, y: e.clientY, entry })
+    },
+    [setSelected]
+  )
 
   const closeContextMenu = useCallback(() => setContextMenu(null), [])
 
@@ -297,27 +332,39 @@ export function FileExplorerProvider({
     if (clipboard.op === "cut") clearClipboard()
   }, [clipboard, ops, path, clearClipboard])
 
-  const compress = useCallback(async (paths: string[]) => {
-    if (paths.length === 0) return
-    await ops.compress(paths, path)
-  }, [ops, path])
+  const compress = useCallback(
+    async (paths: string[], format?: string, level?: string) => {
+      if (paths.length === 0) return
+      await ops.compress(paths, path, undefined, format, level)
+    },
+    [ops, path]
+  )
 
-  const decompress = useCallback(async (p: string) => {
-    try {
-      await fsGateway.decompress(p)
-      reload()
-    } catch (e) {
-      toast.error(fsErrorMessage(e))
-    }
-  }, [reload])
+  const decompress = useCallback(
+    async (p: string) => {
+      try {
+        await fsGateway.decompress(p)
+        reload()
+      } catch (e) {
+        toast.error(fsErrorMessage(e))
+      }
+    },
+    [reload]
+  )
 
-  const duplicate = useCallback(async (p: string) => {
-    await ops.duplicate(p)
-  }, [ops])
+  const duplicate = useCallback(
+    async (p: string) => {
+      await ops.duplicate(p)
+    },
+    [ops]
+  )
 
-  const reveal = useCallback((p: string) => {
-    ops.reveal(p)
-  }, [ops])
+  const reveal = useCallback(
+    (p: string) => {
+      ops.reveal(p)
+    },
+    [ops]
+  )
 
   const copyPathToClipboard = useCallback(async (p: string) => {
     try {
@@ -328,19 +375,22 @@ export function FileExplorerProvider({
     }
   }, [])
 
-  const runInTerminal = useCallback(async (p: string) => {
-    try {
-      const outcome = await fsGateway.runInTerminal(p, terminalId)
-      if (outcome === "fallback_clipboard") {
-        toast.info("Comando copiado al portapapeles", {
-          description:
-            "Tu terminal no soporta ejecución directa. Pegá y presioná Enter.",
-        })
+  const runInTerminal = useCallback(
+    async (p: string) => {
+      try {
+        const outcome = await fsGateway.runInTerminal(p, terminalId)
+        if (outcome === "fallback_clipboard") {
+          toast.info("Comando copiado al portapapeles", {
+            description:
+              "Tu terminal no soporta ejecución directa. Pegá y presioná Enter.",
+          })
+        }
+      } catch (e) {
+        toast.error("No se pudo ejecutar", { description: fsErrorMessage(e) })
       }
-    } catch (e) {
-      toast.error("No se pudo ejecutar", { description: fsErrorMessage(e) })
-    }
-  }, [terminalId])
+    },
+    [terminalId]
+  )
 
   const [quickLookEntry, setQuickLookEntry] = useState<FileEntry | null>(null)
   const openQuickLook = useCallback((e: FileEntry) => setQuickLookEntry(e), [])
@@ -355,19 +405,21 @@ export function FileExplorerProvider({
   }, [deleteTargets, ops, selection])
 
   const selEntry = selected
-    ? entries.find((en) => en.path === selected) ?? null
+    ? (entries.find((en) => en.path === selected) ?? null)
     : null
 
   const selectedEntries = useCallback((): FileEntry[] => {
     const paths = selection.selectedPaths
     if (paths.size === 0) {
-      const anchor = entriesRef.current.find((en) => en.path === selected) ?? null
+      const anchor =
+        entriesRef.current.find((en) => en.path === selected) ?? null
       return anchor ? [anchor] : []
     }
     return entriesRef.current.filter((en) => paths.has(en.path))
   }, [selected, selection.selectedPaths])
 
-  const navEnabled = !contextMenu && deleteTargets.length === 0 && !inline.inlineMode
+  const navEnabled =
+    !contextMenu && deleteTargets.length === 0 && !inline.inlineMode
 
   const scrollToSelected = useCallback((p: string) => {
     tableRef.current
@@ -384,19 +436,28 @@ export function FileExplorerProvider({
     if (filteredEntries.length === 0) return
     if (!keyboardAnchorRef.current) keyboardAnchorRef.current = selected
     const anchor = keyboardAnchorRef.current
-    const anchorIdx = anchor ? filteredEntries.findIndex((en) => en.path === anchor) : 0
+    const anchorIdx = anchor
+      ? filteredEntries.findIndex((en) => en.path === anchor)
+      : 0
     const head = keyboardHeadRef.current ?? anchor
-    const headIdx = head ? filteredEntries.findIndex((en) => en.path === head) : anchorIdx
-    const newHeadIdx = Math.max(0, Math.min(filteredEntries.length - 1, headIdx + step))
+    const headIdx = head
+      ? filteredEntries.findIndex((en) => en.path === head)
+      : anchorIdx
+    const newHeadIdx = Math.max(
+      0,
+      Math.min(filteredEntries.length - 1, headIdx + step)
+    )
     if (newHeadIdx === headIdx) return
     const newHead = filteredEntries[newHeadIdx]
-    const extending = Math.abs(newHeadIdx - anchorIdx) > Math.abs(headIdx - anchorIdx)
+    const extending =
+      Math.abs(newHeadIdx - anchorIdx) > Math.abs(headIdx - anchorIdx)
     if (extending) {
       selection.add(newHead.path)
       keyboardHeadRef.current = newHead.path
     } else {
       const currentHead = filteredEntries[headIdx]
-      if (currentHead && currentHead.path !== anchor) selection.remove(currentHead.path)
+      if (currentHead && currentHead.path !== anchor)
+        selection.remove(currentHead.path)
       keyboardHeadRef.current = newHead.path === anchor ? null : newHead.path
     }
     scrollToSelected(newHead.path)
@@ -442,7 +503,13 @@ export function FileExplorerProvider({
     runInTerminal,
     handleActivate,
     inline,
-    undoStack: { canUndo: undoStack.canUndo, undo: async () => { await undoStack.undo(); await reload() } },
+    undoStack: {
+      canUndo: undoStack.canUndo,
+      undo: async () => {
+        await undoStack.undo()
+        await reload()
+      },
+    },
     reload,
     setViewMode,
     onOpenSettings,
@@ -460,112 +527,175 @@ export function FileExplorerProvider({
 
   const segments = useMemo(() => pathSegments(path), [path])
   const parent = useMemo(() => parentPath(path), [path])
-  const dirCount = useMemo(() => filteredEntries.filter((e) => e.is_dir).length, [filteredEntries])
+  const dirCount = useMemo(
+    () => filteredEntries.filter((e) => e.is_dir).length,
+    [filteredEntries]
+  )
   const fileCount = filteredEntries.length - dirCount
 
-  const value = useMemo((): Value => ({
-    path,
-    onNavigate,
-    onBack,
-    onForward,
-    canBack,
-    canForward,
-    onOpenSearch,
-    onAddFavorite,
-    isFavorite,
-    entries,
-    filteredEntries,
-    loading,
-    error,
-    reload,
-    total,
-    hasMore,
-    loadMore,
-    selected,
-    setSelected,
-    selectedPaths: selection.selectedPaths,
-    isSelected: selection.isSelected,
-    selectAt,
-    selectAll,
-    clearSelection: selection.clear,
-    filterQuery,
-    setFilterQuery,
-    filterRef,
-    tableRef,
-    clipboard,
-    copy,
-    cut,
-    opError: ops.opError,
-    clearOpError: ops.clearError,
-    inlineMode: inline.inlineMode,
-    inlineTarget: inline.inlineTarget,
-    inlineValue: inline.inlineValue,
-    setInlineValue: inline.setInlineValue,
-    startRename: inline.startRename,
-    startNewFolder: inline.startNewFolder,
-    startNewFile: inline.startNewFile,
-    cancelInline: inline.cancelInline,
-    commitInline: inline.commitInline,
-    contextMenu,
-    openContextMenu,
-    closeContextMenu,
-    deleteTargets,
-    setDeleteTargets,
-    confirmDelete,
-    clipboardHas,
-    draggingEntry: dnd.draggingEntry,
-    dragCopyMode: dnd.copyMode,
-    viewMode,
-    setViewMode,
-    terminalId,
-    onOpenSettings,
-    segments,
-    parent,
-    dirCount,
-    fileCount,
-    totalCount: entries.length,
-    handleActivate,
-    handlePaste,
-    compress,
-    decompress,
-    duplicate,
-    reveal,
-    copyPathToClipboard,
-    runInTerminal,
-    sortBy,
-    sortDir,
-    setSortBy,
-    setSortDir,
-    showHidden,
-    setShowHidden,
-    quickLookEntry,
-    openQuickLook,
-    closeQuickLook,
-    canUndo: undoStack.canUndo,
-    undoLabel: undoStack.peek ? describeUndoOp(undoStack.peek) : null,
-    undo,
-    tagFilter,
-  }), [
-    path, onNavigate, onBack, onForward, canBack, canForward,
-    onOpenSearch, onAddFavorite, isFavorite,
-    entries, filteredEntries, loading, error, reload, total, hasMore, loadMore,
-    selected, setSelected, selection, selectAt, selectAll,
-    filterQuery, setFilterQuery, clipboard, copy, cut,
-    ops.opError, ops.clearError,
-    inline.inlineMode, inline.inlineTarget, inline.inlineValue, inline.setInlineValue,
-    inline.startRename, inline.startNewFolder, inline.startNewFile,
-    inline.cancelInline, inline.commitInline,
-    contextMenu, openContextMenu, closeContextMenu,
-    deleteTargets, setDeleteTargets, confirmDelete, clipboardHas,
-    dnd.draggingEntry, dnd.copyMode, viewMode, setViewMode,
-    terminalId, onOpenSettings, segments, parent, dirCount, fileCount,
-    handleActivate, handlePaste, compress, decompress, duplicate, reveal, copyPathToClipboard, runInTerminal,
-    sortBy, sortDir, setSortBy, setSortDir,
-    showHidden, setShowHidden,
-    quickLookEntry, openQuickLook, closeQuickLook,
-    undoStack.canUndo, undoStack.peek, undo,
-    tagFilter,
-  ])
+  const value = useMemo(
+    (): Value => ({
+      path,
+      onNavigate,
+      onBack,
+      onForward,
+      canBack,
+      canForward,
+      onOpenSearch,
+      onAddFavorite,
+      isFavorite,
+      entries,
+      filteredEntries,
+      loading,
+      error,
+      reload,
+      total,
+      hasMore,
+      loadMore,
+      selected,
+      setSelected,
+      selectedPaths: selection.selectedPaths,
+      isSelected: selection.isSelected,
+      selectAt,
+      selectAll,
+      clearSelection: selection.clear,
+      filterQuery,
+      setFilterQuery,
+      filterRef,
+      tableRef,
+      clipboard,
+      copy,
+      cut,
+      opError: ops.opError,
+      clearOpError: ops.clearError,
+      inlineMode: inline.inlineMode,
+      inlineTarget: inline.inlineTarget,
+      inlineValue: inline.inlineValue,
+      setInlineValue: inline.setInlineValue,
+      startRename: inline.startRename,
+      startNewFolder: inline.startNewFolder,
+      startNewFile: inline.startNewFile,
+      cancelInline: inline.cancelInline,
+      commitInline: inline.commitInline,
+      contextMenu,
+      openContextMenu,
+      closeContextMenu,
+      deleteTargets,
+      setDeleteTargets,
+      confirmDelete,
+      clipboardHas,
+      draggingEntry: dnd.draggingEntry,
+      dragCopyMode: dnd.copyMode,
+      viewMode,
+      setViewMode,
+      terminalId,
+      onOpenSettings,
+      segments,
+      parent,
+      dirCount,
+      fileCount,
+      totalCount: entries.length,
+      handleActivate,
+      handlePaste,
+      compress,
+      decompress,
+      duplicate,
+      reveal,
+      copyPathToClipboard,
+      runInTerminal,
+      sortBy,
+      sortDir,
+      setSortBy,
+      setSortDir,
+      showHidden,
+      setShowHidden,
+      quickLookEntry,
+      openQuickLook,
+      closeQuickLook,
+      canUndo: undoStack.canUndo,
+      undoLabel: undoStack.peek ? describeUndoOp(undoStack.peek) : null,
+      undo,
+      tagFilter,
+    }),
+    [
+      path,
+      onNavigate,
+      onBack,
+      onForward,
+      canBack,
+      canForward,
+      onOpenSearch,
+      onAddFavorite,
+      isFavorite,
+      entries,
+      filteredEntries,
+      loading,
+      error,
+      reload,
+      total,
+      hasMore,
+      loadMore,
+      selected,
+      setSelected,
+      selection,
+      selectAt,
+      selectAll,
+      filterQuery,
+      setFilterQuery,
+      clipboard,
+      copy,
+      cut,
+      ops.opError,
+      ops.clearError,
+      inline.inlineMode,
+      inline.inlineTarget,
+      inline.inlineValue,
+      inline.setInlineValue,
+      inline.startRename,
+      inline.startNewFolder,
+      inline.startNewFile,
+      inline.cancelInline,
+      inline.commitInline,
+      contextMenu,
+      openContextMenu,
+      closeContextMenu,
+      deleteTargets,
+      setDeleteTargets,
+      confirmDelete,
+      clipboardHas,
+      dnd.draggingEntry,
+      dnd.copyMode,
+      viewMode,
+      setViewMode,
+      terminalId,
+      onOpenSettings,
+      segments,
+      parent,
+      dirCount,
+      fileCount,
+      handleActivate,
+      handlePaste,
+      compress,
+      decompress,
+      duplicate,
+      reveal,
+      copyPathToClipboard,
+      runInTerminal,
+      sortBy,
+      sortDir,
+      setSortBy,
+      setSortDir,
+      showHidden,
+      setShowHidden,
+      quickLookEntry,
+      openQuickLook,
+      closeQuickLook,
+      undoStack.canUndo,
+      undoStack.peek,
+      undo,
+      tagFilter,
+    ]
+  )
 
   return (
     <Ctx.Provider value={value}>
@@ -584,7 +714,9 @@ export function FileExplorerProvider({
                 isDir={dnd.draggingEntry.is_dir}
                 extension={dnd.draggingEntry.extension}
               />
-              <span className="max-w-48 truncate">{dnd.draggingEntry.name}</span>
+              <span className="max-w-48 truncate">
+                {dnd.draggingEntry.name}
+              </span>
               {dnd.copyMode && (
                 <span className="ml-1 rounded bg-primary/20 px-1.5 py-0.5 text-[10px] font-medium text-primary">
                   Copiar

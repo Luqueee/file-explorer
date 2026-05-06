@@ -104,9 +104,9 @@ export function useFileOps(
         await fsGateway.duplicate(path)
       }),
 
-    compress: (paths: string[], destDir: string, archiveName?: string) =>
+    compress: (paths: string[], destDir: string, archiveName?: string, format?: string, level?: string) =>
       wrap(async () => {
-        await fsGateway.compress(paths, destDir, archiveName ?? null)
+        await fsGateway.compress(paths, destDir, archiveName ?? null, format ?? null, level ?? null)
       }),
   }
 }

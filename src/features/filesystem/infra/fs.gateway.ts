@@ -87,12 +87,16 @@ export const fsGateway = {
   compress: (
     paths: string[],
     destDir: string,
-    archiveName?: string | null
+    archiveName?: string | null,
+    format?: string | null,
+    level?: string | null
   ) =>
     invoke<string>("compress_entries", {
       paths,
       destDir,
       archiveName: archiveName ?? null,
+      format: format ?? null,
+      level: level ?? null,
     }),
   decompress: (path: string) =>
     invoke<string>("decompress_entry", { path }),

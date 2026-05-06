@@ -2,7 +2,7 @@ use std::collections::{HashMap, HashSet};
 use std::fs::File;
 use std::io::{BufWriter, Read, Seek, SeekFrom, Write};
 use std::path::{Path, PathBuf};
-use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU64, AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex};
 use std::thread;
 
@@ -10,7 +10,20 @@ use tauri::Emitter;
 
 use crate::path_safety::{ensure_within, reject_traversal, validate_filename};
 
-const ZSTD_LEVEL: i32 = 3;
+// Incompressible file types — storing them uncompressed saves CPU with no size penalty
+const INCOMPRESSIBLE_EXTS: &[&str] = &[
+    "jpg", "jpeg", "png", "gif", "webp", "avif", "heic", "heif",
+    "mp4", "mkv", "mov", "avi", "wmv", "m4v", "webm",
+    "mp3", "m4a", "aac", "flac", "ogg", "opus", "wav",
+    "zip", "gz", "bz2", "zst", "xz", "7z", "rar", "br", "lz4",
+];
+
+fn is_incompressible(path: &Path) -> bool {
+    path.extension()
+        .and_then(|e| e.to_str())
+        .map(|e| INCOMPRESSIBLE_EXTS.contains(&e.to_lowercase().as_str()))
+        .unwrap_or(false)
+}
 
 static OP_COUNTER: AtomicUsize = AtomicUsize::new(1);
 
@@ -52,6 +65,45 @@ impl CancelMap {
 }
 
 // ---------------------------------------------------------------------------
+// CountingReader — tracks bytes read through it
+// ---------------------------------------------------------------------------
+
+struct CountingReader<R: Read> {
+    inner: R,
+    counter: Arc<AtomicU64>,
+}
+
+impl<R: Read> Read for CountingReader<R> {
+    fn read(&mut self, buf: &mut [u8]) -> std::io::Result<usize> {
+        let n = self.inner.read(buf)?;
+        self.counter.fetch_add(n as u64, Ordering::Relaxed);
+        Ok(n)
+    }
+}
+
+impl<R: Read + Seek> Seek for CountingReader<R> {
+    fn seek(&mut self, pos: SeekFrom) -> std::io::Result<u64> {
+        self.inner.seek(pos)
+    }
+}
+
+// TickReader — calls a closure on every read, forwarding byte count
+struct TickReader<R: Read, F: Fn(u64)> {
+    inner: R,
+    bytes: u64,
+    tick: F,
+}
+
+impl<R: Read, F: Fn(u64)> Read for TickReader<R, F> {
+    fn read(&mut self, buf: &mut [u8]) -> std::io::Result<usize> {
+        let n = self.inner.read(buf)?;
+        self.bytes += n as u64;
+        (self.tick)(self.bytes);
+        Ok(n)
+    }
+}
+
+// ---------------------------------------------------------------------------
 // Progress payload
 // ---------------------------------------------------------------------------
 
@@ -66,11 +118,34 @@ struct ProgressPayload {
     done: bool,
     output: Option<String>,
     cancelled: bool,
+    bytes_processed: u64,
+    total_bytes: u64, // 0 = unknown
 }
 
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
+
+fn dir_size(path: &Path) -> u64 {
+    std::fs::read_dir(path)
+        .map(|entries| {
+            entries
+                .filter_map(|e| e.ok())
+                .map(|e| {
+                    let p = e.path();
+                    if p.is_dir() { dir_size(&p) } else { p.metadata().map(|m| m.len()).unwrap_or(0) }
+                })
+                .sum()
+        })
+        .unwrap_or(0)
+}
+
+fn calc_total_bytes(sources: &[PathBuf]) -> u64 {
+    sources
+        .iter()
+        .map(|s| if s.is_dir() { dir_size(s) } else { s.metadata().map(|m| m.len()).unwrap_or(0) })
+        .sum()
+}
 
 fn workers() -> u32 {
     thread::available_parallelism()
@@ -168,20 +243,127 @@ fn detect_kind(name: &str) -> Option<(ArchiveKind, &str)> {
 }
 
 // ---------------------------------------------------------------------------
+// Compression level preset
+// ---------------------------------------------------------------------------
+
+#[derive(Clone, Copy, PartialEq, Eq)]
+pub enum CompressLevel {
+    Fast,
+    Normal,
+    Best,
+}
+
+impl CompressLevel {
+    fn from_str(s: &str) -> Self {
+        match s {
+            "fast" => Self::Fast,
+            "best" => Self::Best,
+            _ => Self::Normal,
+        }
+    }
+
+    fn zstd(self) -> i32 {
+        match self { Self::Fast => 1, Self::Normal => 3, Self::Best => 19 }
+    }
+
+    fn deflate(self) -> flate2::Compression {
+        match self {
+            Self::Fast => flate2::Compression::fast(),
+            Self::Normal => flate2::Compression::default(),
+            Self::Best => flate2::Compression::best(),
+        }
+    }
+
+    fn bzip2(self) -> bzip2::Compression {
+        match self {
+            Self::Fast => bzip2::Compression::fast(),
+            Self::Normal => bzip2::Compression::default(),
+            Self::Best => bzip2::Compression::best(),
+        }
+    }
+
+    fn zip_level(self) -> i64 {
+        match self { Self::Fast => 1, Self::Normal => 6, Self::Best => 9 }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Supported compression formats
+// ---------------------------------------------------------------------------
+
+#[derive(Clone, Copy, PartialEq, Eq)]
+pub enum CompressFormat {
+    TarZst,
+    TarGz,
+    TarBz2,
+    Zip,
+}
+
+impl CompressFormat {
+    fn from_str(s: &str) -> Self {
+        match s {
+            "tar.gz" | "tgz" => Self::TarGz,
+            "tar.bz2" | "tbz2" => Self::TarBz2,
+            "zip" => Self::Zip,
+            _ => Self::TarZst,
+        }
+    }
+
+    /// Returns the file extension for this format (multi-file or single-file archive).
+    fn multi_ext(self) -> &'static str {
+        match self {
+            Self::TarZst => "tar.zst",
+            Self::TarGz  => "tar.gz",
+            Self::TarBz2 => "tar.bz2",
+            Self::Zip    => "zip",
+        }
+    }
+
+    /// Extension used when archiving a single raw file (only relevant for zst).
+    fn single_ext(self) -> &'static str {
+        match self {
+            Self::TarZst => "zst",
+            _            => self.multi_ext(),
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Tar file append with intra-file progress
+// ---------------------------------------------------------------------------
+
+fn tar_append_file_ticked<W: Write>(
+    tar: &mut tar::Builder<W>,
+    src: &Path,
+    name: &str,
+    on_tick: impl Fn(u64),
+) -> Result<(), String> {
+    let metadata = src.metadata().map_err(|e| e.to_string())?;
+    let mut header = tar::Header::new_gnu();
+    header.set_path(name).map_err(|e| e.to_string())?;
+    header.set_metadata(&metadata);
+    header.set_cksum();
+    let file = File::open(src).map_err(|e| e.to_string())?;
+    let reader = TickReader { inner: file, bytes: 0, tick: on_tick };
+    tar.append(&header, reader).map_err(|e| e.to_string())
+}
+
+// ---------------------------------------------------------------------------
 // Core workers (run on a blocking thread)
 // ---------------------------------------------------------------------------
 
-fn run_compression(
+fn run_compression_zst(
     sources: &[PathBuf],
     out_path: &Path,
     single_file: bool,
-    on_progress: impl Fn(usize, usize, &str),
+    level: CompressLevel,
+    on_progress: impl Fn(usize, usize, &str, u64),
     should_cancel: impl Fn() -> bool,
 ) -> Result<(), String> {
     let file = File::create(out_path).map_err(|e| e.to_string())?;
     let writer = BufWriter::with_capacity(1 << 20, file);
     let mut encoder =
-        zstd::stream::Encoder::new(writer, ZSTD_LEVEL).map_err(|e| e.to_string())?;
+        zstd::stream::Encoder::new(writer, level.zstd()).map_err(|e| e.to_string())?;
     encoder.multithread(workers()).map_err(|e| e.to_string())?;
     encoder.include_checksum(true).map_err(|e| e.to_string())?;
 
@@ -193,13 +375,23 @@ fn run_compression(
             .file_name()
             .and_then(|n| n.to_str())
             .unwrap_or("");
-        on_progress(1, 1, name);
         let mut input = File::open(&sources[0]).map_err(|e| e.to_string())?;
-        std::io::copy(&mut input, &mut encoder).map_err(|e| e.to_string())?;
+        let mut buf = vec![0u8; 1 << 20];
+        let mut bytes_done: u64 = 0;
+        on_progress(1, 1, name, bytes_done);
+        loop {
+            if should_cancel() { return Err("__CANCELLED__".into()); }
+            let n = input.read(&mut buf).map_err(|e| e.to_string())?;
+            if n == 0 { break; }
+            encoder.write_all(&buf[..n]).map_err(|e| e.to_string())?;
+            bytes_done += n as u64;
+            on_progress(1, 1, name, bytes_done);
+        }
     } else {
         let total = sources.len();
         let mut tar = tar::Builder::new(&mut encoder);
         tar.follow_symlinks(false);
+        let mut bytes_done: u64 = 0;
         for (i, src) in sources.iter().enumerate() {
             if should_cancel() {
                 return Err("__CANCELLED__".into());
@@ -208,12 +400,18 @@ fn run_compression(
                 .file_name()
                 .and_then(|n| n.to_str())
                 .ok_or("Nombre inválido")?;
-            on_progress(i + 1, total, name);
+            on_progress(i + 1, total, name, bytes_done);
             if src.is_dir() {
                 tar.append_dir_all(name, src).map_err(|e| e.to_string())?;
+                bytes_done += dir_size(src);
+                on_progress(i + 1, total, name, bytes_done);
             } else {
-                tar.append_path_with_name(src, name)
-                    .map_err(|e| e.to_string())?;
+                let base = bytes_done;
+                let file_size = src.metadata().map(|m| m.len()).unwrap_or(0);
+                tar_append_file_ticked(&mut tar, src, name, |file_bytes| {
+                    on_progress(i + 1, total, name, base + file_bytes);
+                })?;
+                bytes_done = base + file_size;
             }
         }
         tar.finish().map_err(|e| e.to_string())?;
@@ -221,6 +419,182 @@ fn run_compression(
 
     let writer = encoder.finish().map_err(|e| e.to_string())?;
     writer.into_inner().map_err(|e| e.to_string())?;
+    Ok(())
+}
+
+fn zip_options_for(path: &Path, level: CompressLevel) -> zip::write::SimpleFileOptions {
+    let base = zip::write::SimpleFileOptions::default();
+    if level == CompressLevel::Fast && is_incompressible(path) {
+        base.compression_method(zip::CompressionMethod::Stored)
+    } else {
+        base.compression_method(zip::CompressionMethod::Deflated)
+            .compression_level(Some(level.zip_level()))
+    }
+}
+
+fn add_dir_to_zip<W: std::io::Write + std::io::Seek>(
+    zip: &mut zip::ZipWriter<W>,
+    dir: &Path,
+    prefix: &str,
+    level: CompressLevel,
+    should_cancel: &impl Fn() -> bool,
+) -> Result<(), String> {
+    let dir_name = format!("{}/", prefix);
+    let dir_opts = zip::write::SimpleFileOptions::default()
+        .compression_method(zip::CompressionMethod::Stored);
+    zip.add_directory(&dir_name, dir_opts).map_err(|e| e.to_string())?;
+    for entry in std::fs::read_dir(dir).map_err(|e| e.to_string())? {
+        if should_cancel() {
+            return Err("__CANCELLED__".into());
+        }
+        let entry = entry.map_err(|e| e.to_string())?;
+        let path = entry.path();
+        let name = path
+            .file_name()
+            .and_then(|n| n.to_str())
+            .ok_or("Nombre inválido")?;
+        let zip_path = format!("{}/{}", prefix, name);
+        if path.is_dir() {
+            add_dir_to_zip(zip, &path, &zip_path, level, should_cancel)?;
+        } else {
+            let opts = zip_options_for(&path, level);
+            zip.start_file(&zip_path, opts).map_err(|e| e.to_string())?;
+            let mut f = File::open(&path).map_err(|e| e.to_string())?;
+            std::io::copy(&mut f, zip).map_err(|e| e.to_string())?;
+        }
+    }
+    Ok(())
+}
+
+fn run_compression_zip(
+    sources: &[PathBuf],
+    out_path: &Path,
+    level: CompressLevel,
+    on_progress: impl Fn(usize, usize, &str, u64),
+    should_cancel: impl Fn() -> bool,
+) -> Result<(), String> {
+    let file = File::create(out_path).map_err(|e| e.to_string())?;
+    let writer = BufWriter::with_capacity(1 << 20, file);
+    let mut zip = zip::ZipWriter::new(writer);
+
+    let total = sources.len();
+    let mut bytes_done: u64 = 0;
+    for (i, src) in sources.iter().enumerate() {
+        if should_cancel() {
+            return Err("__CANCELLED__".into());
+        }
+        let name = src
+            .file_name()
+            .and_then(|n| n.to_str())
+            .ok_or("Nombre inválido")?;
+        on_progress(i + 1, total, name, bytes_done);
+        if src.is_dir() {
+            add_dir_to_zip(&mut zip, src, name, level, &should_cancel)?;
+            bytes_done += dir_size(src);
+            on_progress(i + 1, total, name, bytes_done);
+        } else {
+            let opts = zip_options_for(src, level);
+            zip.start_file(name, opts).map_err(|e| e.to_string())?;
+            let mut f = File::open(src).map_err(|e| e.to_string())?;
+            let mut buf = vec![0u8; 1 << 20];
+            let base = bytes_done;
+            let mut file_bytes: u64 = 0;
+            loop {
+                if should_cancel() { return Err("__CANCELLED__".into()); }
+                let n = f.read(&mut buf).map_err(|e| e.to_string())?;
+                if n == 0 { break; }
+                zip.write_all(&buf[..n]).map_err(|e| e.to_string())?;
+                file_bytes += n as u64;
+                bytes_done = base + file_bytes;
+                on_progress(i + 1, total, name, bytes_done);
+            }
+        }
+    }
+    zip.finish().map_err(|e| e.to_string())?;
+    Ok(())
+}
+
+fn run_compression_tar_gz(
+    sources: &[PathBuf],
+    out_path: &Path,
+    level: CompressLevel,
+    on_progress: impl Fn(usize, usize, &str, u64),
+    should_cancel: impl Fn() -> bool,
+) -> Result<(), String> {
+    let file = File::create(out_path).map_err(|e| e.to_string())?;
+    let writer = BufWriter::with_capacity(1 << 20, file);
+    let enc = flate2::write::GzEncoder::new(writer, level.deflate());
+    let mut tar_builder = tar::Builder::new(enc);
+    tar_builder.follow_symlinks(false);
+
+    let total = sources.len();
+    let mut bytes_done: u64 = 0;
+    for (i, src) in sources.iter().enumerate() {
+        if should_cancel() {
+            return Err("__CANCELLED__".into());
+        }
+        let name = src
+            .file_name()
+            .and_then(|n| n.to_str())
+            .ok_or("Nombre inválido")?;
+        on_progress(i + 1, total, name, bytes_done);
+        if src.is_dir() {
+            tar_builder.append_dir_all(name, src).map_err(|e| e.to_string())?;
+            bytes_done += dir_size(src);
+            on_progress(i + 1, total, name, bytes_done);
+        } else {
+            let base = bytes_done;
+            let file_size = src.metadata().map(|m| m.len()).unwrap_or(0);
+            tar_append_file_ticked(&mut tar_builder, src, name, |file_bytes| {
+                on_progress(i + 1, total, name, base + file_bytes);
+            })?;
+            bytes_done = base + file_size;
+        }
+    }
+    let enc = tar_builder.into_inner().map_err(|e| e.to_string())?;
+    enc.finish().map_err(|e| e.to_string())?;
+    Ok(())
+}
+
+fn run_compression_tar_bz2(
+    sources: &[PathBuf],
+    out_path: &Path,
+    level: CompressLevel,
+    on_progress: impl Fn(usize, usize, &str, u64),
+    should_cancel: impl Fn() -> bool,
+) -> Result<(), String> {
+    let file = File::create(out_path).map_err(|e| e.to_string())?;
+    let writer = BufWriter::with_capacity(1 << 20, file);
+    let enc = bzip2::write::BzEncoder::new(writer, level.bzip2());
+    let mut tar_builder = tar::Builder::new(enc);
+    tar_builder.follow_symlinks(false);
+
+    let total = sources.len();
+    let mut bytes_done: u64 = 0;
+    for (i, src) in sources.iter().enumerate() {
+        if should_cancel() {
+            return Err("__CANCELLED__".into());
+        }
+        let name = src
+            .file_name()
+            .and_then(|n| n.to_str())
+            .ok_or("Nombre inválido")?;
+        on_progress(i + 1, total, name, bytes_done);
+        if src.is_dir() {
+            tar_builder.append_dir_all(name, src).map_err(|e| e.to_string())?;
+            bytes_done += dir_size(src);
+            on_progress(i + 1, total, name, bytes_done);
+        } else {
+            let base = bytes_done;
+            let file_size = src.metadata().map(|m| m.len()).unwrap_or(0);
+            tar_append_file_ticked(&mut tar_builder, src, name, |file_bytes| {
+                on_progress(i + 1, total, name, base + file_bytes);
+            })?;
+            bytes_done = base + file_size;
+        }
+    }
+    let enc = tar_builder.into_inner().map_err(|e| e.to_string())?;
+    enc.finish().map_err(|e| e.to_string())?;
     Ok(())
 }
 
@@ -249,14 +623,13 @@ fn extract_tar<R: Read>(
     Ok(())
 }
 
-fn extract_zip(
-    src: &Path,
+fn extract_zip<R: Read + Seek>(
+    reader: R,
     out_dir: &Path,
     on_progress: &impl Fn(usize, &str),
     should_cancel: &impl Fn() -> bool,
 ) -> Result<(), String> {
-    let file = File::open(src).map_err(|e| e.to_string())?;
-    let mut archive = zip::ZipArchive::new(file).map_err(|e| e.to_string())?;
+    let mut archive = zip::ZipArchive::new(reader).map_err(|e| e.to_string())?;
     let total = archive.len();
     for i in 0..total {
         if should_cancel() {
@@ -289,58 +662,92 @@ fn run_decompression(
     src: &Path,
     out_path: &Path,
     kind: ArchiveKind,
-    on_progress: impl Fn(usize, &str),
+    on_progress: impl Fn(usize, &str, u64),
     should_cancel: impl Fn() -> bool,
 ) -> Result<(), String> {
     use flate2::read::GzDecoder;
     use bzip2::read::BzDecoder;
 
+    let bytes_counter = Arc::new(AtomicU64::new(0));
+
+    macro_rules! counting_file {
+        () => {{
+            let f = File::open(src).map_err(|e| e.to_string())?;
+            CountingReader { inner: f, counter: bytes_counter.clone() }
+        }};
+    }
+
+    let bc = bytes_counter.clone();
+    let prog = |current: usize, label: &str| {
+        on_progress(current, label, bc.load(Ordering::Relaxed));
+    };
+
     match kind {
         ArchiveKind::TarZst => {
-            let file = File::open(src).map_err(|e| e.to_string())?;
-            let dec = zstd::stream::Decoder::new(file).map_err(|e| e.to_string())?;
-            extract_tar(dec, out_path, &on_progress, &should_cancel)
+            let dec = zstd::stream::Decoder::new(counting_file!()).map_err(|e| e.to_string())?;
+            extract_tar(dec, out_path, &prog, &should_cancel)
         }
         ArchiveKind::TarGz => {
-            let file = File::open(src).map_err(|e| e.to_string())?;
-            extract_tar(GzDecoder::new(file), out_path, &on_progress, &should_cancel)
+            extract_tar(GzDecoder::new(counting_file!()), out_path, &prog, &should_cancel)
         }
         ArchiveKind::TarBz2 => {
-            let file = File::open(src).map_err(|e| e.to_string())?;
-            extract_tar(BzDecoder::new(file), out_path, &on_progress, &should_cancel)
+            extract_tar(BzDecoder::new(counting_file!()), out_path, &prog, &should_cancel)
         }
         ArchiveKind::Tar => {
-            let file = File::open(src).map_err(|e| e.to_string())?;
-            extract_tar(file, out_path, &on_progress, &should_cancel)
+            extract_tar(counting_file!(), out_path, &prog, &should_cancel)
         }
-        ArchiveKind::Zip => extract_zip(src, out_path, &on_progress, &should_cancel),
-        ArchiveKind::Iso => extract_iso(src, out_path, &on_progress, &should_cancel),
-        // Raw single-file decompressors — out_path is a file, not a directory
+        ArchiveKind::Zip => {
+            extract_zip(counting_file!(), out_path, &prog, &should_cancel)
+        }
+        ArchiveKind::Iso => extract_iso(src, out_path, &prog, &should_cancel),
+        // Raw single-file decompressors — chunked copy for smooth progress
         ArchiveKind::Zst => {
             if should_cancel() { return Err("__CANCELLED__".into()); }
-            on_progress(1, src.file_name().and_then(|n| n.to_str()).unwrap_or(""));
-            let file = File::open(src).map_err(|e| e.to_string())?;
-            let mut dec = zstd::stream::Decoder::new(file).map_err(|e| e.to_string())?;
+            let label = src.file_name().and_then(|n| n.to_str()).unwrap_or("");
+            let counting = counting_file!();
+            let mut dec = zstd::stream::Decoder::new(counting).map_err(|e| e.to_string())?;
             let mut out = File::create(out_path).map_err(|e| e.to_string())?;
-            std::io::copy(&mut dec, &mut out).map_err(|e| e.to_string())?;
+            let mut buf = vec![0u8; 1 << 20];
+            prog(1, label);
+            loop {
+                if should_cancel() { return Err("__CANCELLED__".into()); }
+                let n = dec.read(&mut buf).map_err(|e| e.to_string())?;
+                if n == 0 { break; }
+                out.write_all(&buf[..n]).map_err(|e| e.to_string())?;
+                prog(1, label);
+            }
             Ok(())
         }
         ArchiveKind::Gz => {
             if should_cancel() { return Err("__CANCELLED__".into()); }
-            on_progress(1, src.file_name().and_then(|n| n.to_str()).unwrap_or(""));
-            let file = File::open(src).map_err(|e| e.to_string())?;
-            let mut dec = GzDecoder::new(file);
+            let label = src.file_name().and_then(|n| n.to_str()).unwrap_or("");
+            let mut dec = GzDecoder::new(counting_file!());
             let mut out = File::create(out_path).map_err(|e| e.to_string())?;
-            std::io::copy(&mut dec, &mut out).map_err(|e| e.to_string())?;
+            let mut buf = vec![0u8; 1 << 20];
+            prog(1, label);
+            loop {
+                if should_cancel() { return Err("__CANCELLED__".into()); }
+                let n = dec.read(&mut buf).map_err(|e| e.to_string())?;
+                if n == 0 { break; }
+                out.write_all(&buf[..n]).map_err(|e| e.to_string())?;
+                prog(1, label);
+            }
             Ok(())
         }
         ArchiveKind::Bz2 => {
             if should_cancel() { return Err("__CANCELLED__".into()); }
-            on_progress(1, src.file_name().and_then(|n| n.to_str()).unwrap_or(""));
-            let file = File::open(src).map_err(|e| e.to_string())?;
-            let mut dec = BzDecoder::new(file);
+            let label = src.file_name().and_then(|n| n.to_str()).unwrap_or("");
+            let mut dec = BzDecoder::new(counting_file!());
             let mut out = File::create(out_path).map_err(|e| e.to_string())?;
-            std::io::copy(&mut dec, &mut out).map_err(|e| e.to_string())?;
+            let mut buf = vec![0u8; 1 << 20];
+            prog(1, label);
+            loop {
+                if should_cancel() { return Err("__CANCELLED__".into()); }
+                let n = dec.read(&mut buf).map_err(|e| e.to_string())?;
+                if n == 0 { break; }
+                out.write_all(&buf[..n]).map_err(|e| e.to_string())?;
+                prog(1, label);
+            }
             Ok(())
         }
     }
@@ -351,6 +758,8 @@ fn run_decompression(
 // ---------------------------------------------------------------------------
 
 /// Compress one or more entries into a single archive in `dest_dir`.
+/// `format`: "tar.zst" (default) | "tar.gz" | "tar.bz2" | "zip"
+/// `level`: "fast" | "normal" (default) | "best"
 #[tauri::command]
 pub async fn compress_entries(
     app: tauri::AppHandle,
@@ -358,6 +767,8 @@ pub async fn compress_entries(
     paths: Vec<String>,
     dest_dir: String,
     archive_name: Option<String>,
+    format: Option<String>,
+    level: Option<String>,
 ) -> Result<String, String> {
     if paths.is_empty() {
         return Err("Sin archivos para comprimir".into());
@@ -367,6 +778,9 @@ pub async fn compress_entries(
     if !dest.is_dir() {
         return Err("Destino inválido".into());
     }
+
+    let fmt = CompressFormat::from_str(format.as_deref().unwrap_or("tar.zst"));
+    let lvl = CompressLevel::from_str(level.as_deref().unwrap_or("normal"));
 
     let sources: Vec<PathBuf> = paths.iter().map(PathBuf::from).collect();
     for s in &sources {
@@ -378,7 +792,10 @@ pub async fn compress_entries(
 
     detect_collisions(&sources)?;
 
-    let single_file = sources.len() == 1 && sources[0].is_file();
+    let total_bytes = calc_total_bytes(&sources);
+
+    // Only .zst has a distinct single-file mode; all other formats always produce a container.
+    let single_file = fmt == CompressFormat::TarZst && sources.len() == 1 && sources[0].is_file();
 
     let out_path = if single_file {
         let src = &sources[0];
@@ -386,7 +803,7 @@ pub async fn compress_entries(
             .file_name()
             .and_then(|n| n.to_str())
             .ok_or("Nombre inválido")?;
-        let target = format!("{}.zst", name);
+        let target = format!("{}.{}", name, fmt.single_ext());
         validate_filename(&target)?;
         unique_dest(&dest.join(target))
     } else {
@@ -398,7 +815,7 @@ pub async fn compress_entries(
                 .to_string()
         });
         validate_filename(&base)?;
-        let target = format!("{}.tar.zst", base);
+        let target = format!("{}.{}", base, fmt.multi_ext());
         unique_dest(&dest.join(target))
     };
 
@@ -425,6 +842,8 @@ pub async fn compress_entries(
             done: false,
             output: None,
             cancelled: false,
+            bytes_processed: 0,
+            total_bytes,
         },
     );
 
@@ -433,27 +852,30 @@ pub async fn compress_entries(
     let partial_clone = partial.clone();
     let cancel_flag_clone = cancel_flag.clone();
     let result = tauri::async_runtime::spawn_blocking(move || {
-        run_compression(
-            &sources,
-            &partial_clone,
-            single_file,
-            |current, total, label| {
-                let _ = app_clone.emit(
-                    "archive://progress",
-                    ProgressPayload {
-                        id: op_id_clone.clone(),
-                        operation: "compress".into(),
-                        current,
-                        total: total as i64,
-                        label: label.to_string(),
-                        done: false,
-                        output: None,
-                        cancelled: false,
-                    },
-                );
-            },
-            move || cancel_flag_clone.load(Ordering::Relaxed),
-        )
+        let on_progress = |current, total, label: &str, bytes_processed: u64| {
+            let _ = app_clone.emit(
+                "archive://progress",
+                ProgressPayload {
+                    id: op_id_clone.clone(),
+                    operation: "compress".into(),
+                    current,
+                    total: total as i64,
+                    label: label.to_string(),
+                    done: false,
+                    output: None,
+                    cancelled: false,
+                    bytes_processed,
+                    total_bytes,
+                },
+            );
+        };
+        let should_cancel = move || cancel_flag_clone.load(Ordering::Relaxed);
+        match fmt {
+            CompressFormat::TarZst => run_compression_zst(&sources, &partial_clone, single_file, lvl, on_progress, should_cancel),
+            CompressFormat::Zip    => run_compression_zip(&sources, &partial_clone, lvl, on_progress, should_cancel),
+            CompressFormat::TarGz  => run_compression_tar_gz(&sources, &partial_clone, lvl, on_progress, should_cancel),
+            CompressFormat::TarBz2 => run_compression_tar_bz2(&sources, &partial_clone, lvl, on_progress, should_cancel),
+        }
     })
     .await
     // Flatten JoinError into our error type so unregister always runs below.
@@ -476,6 +898,8 @@ pub async fn compress_entries(
                 done: true,
                 output: None,
                 cancelled,
+                bytes_processed: 0,
+                total_bytes,
             },
         );
         return Err(e.clone());
@@ -502,6 +926,8 @@ pub async fn compress_entries(
             done: true,
             output: Some(out_path.to_string_lossy().to_string()),
             cancelled: false,
+            bytes_processed: total_bytes,
+            total_bytes,
         },
     );
 
@@ -535,6 +961,7 @@ pub async fn decompress_entry(
         return Err("Nombre de archivo inválido".into());
     }
 
+    let file_size = src.metadata().map(|m| m.len()).unwrap_or(0);
     let is_multi = kind.is_multi_file();
     let base_out = parent.join(stem);
     let out_path = unique_dest(&base_out);
@@ -566,6 +993,8 @@ pub async fn decompress_entry(
             done: false,
             output: None,
             cancelled: false,
+            bytes_processed: 0,
+            total_bytes: file_size,
         },
     );
 
@@ -579,7 +1008,7 @@ pub async fn decompress_entry(
             &src_clone,
             &effective_out,
             kind,
-            |current, label| {
+            |current, label, bytes_processed| {
                 let _ = app_clone.emit(
                     "archive://progress",
                     ProgressPayload {
@@ -591,6 +1020,8 @@ pub async fn decompress_entry(
                         done: false,
                         output: None,
                         cancelled: false,
+                        bytes_processed,
+                        total_bytes: file_size,
                     },
                 );
             },
@@ -623,6 +1054,8 @@ pub async fn decompress_entry(
                 done: true,
                 output: None,
                 cancelled,
+                bytes_processed: 0,
+                total_bytes: file_size,
             },
         );
         return Err(e.clone());
@@ -651,6 +1084,8 @@ pub async fn decompress_entry(
             done: true,
             output: Some(out_path.to_string_lossy().to_string()),
             cancelled: false,
+            bytes_processed: file_size,
+            total_bytes: file_size,
         },
     );
 

@@ -14,6 +14,8 @@ export interface ArchiveOperation {
   etaMs: number | null
   done: boolean
   outputName: string | null
+  bytesProcessed: number
+  totalBytes: number // 0 = unknown
 }
 
 interface ArchiveProgressEvent {
@@ -25,6 +27,8 @@ interface ArchiveProgressEvent {
   done: boolean
   output: string | null
   cancelled: boolean
+  bytesProcessed: number
+  totalBytes: number
 }
 
 export function useArchiveOperations() {
@@ -40,7 +44,7 @@ export function useArchiveOperations() {
     const unlistenPromise = listen<ArchiveProgressEvent>(
       "archive://progress",
       ({ payload }) => {
-        const { id, operation, current, total, label, done, output, cancelled } =
+        const { id, operation, current, total, label, done, output, cancelled, bytesProcessed, totalBytes } =
           payload
 
         if (done) {
@@ -60,9 +64,11 @@ export function useArchiveOperations() {
               const next = new Map(prev)
               const existing = next.get(id)
               next.set(id, {
-                ...(existing ?? { id, operation, current: 1, total: 1, label, startedAt: Date.now(), etaMs: null }),
+                ...(existing ?? { id, operation, current: 1, total: 1, label, startedAt: Date.now(), etaMs: null, bytesProcessed: 0, totalBytes: 0 }),
                 done: true,
                 outputName,
+                bytesProcessed: totalBytes,
+                totalBytes,
               })
               return next
             })
@@ -101,13 +107,19 @@ export function useArchiveOperations() {
               etaMs: null,
               done: false,
               outputName: null,
+              bytesProcessed,
+              totalBytes,
             })
           } else {
             // Subsequent event — update progress and recompute ETA
             const elapsed = Date.now() - existing.startedAt
             let etaMs: number | null = null
-            if (total > 0 && current > 0) {
-              const rate = elapsed / current // ms per item
+            if (totalBytes > 0 && bytesProcessed > 0) {
+              // Bytes-based ETA: more accurate than file count
+              const rate = elapsed / bytesProcessed // ms per byte
+              etaMs = rate * (totalBytes - bytesProcessed)
+            } else if (total > 0 && current > 0) {
+              const rate = elapsed / current // ms per item fallback
               etaMs = rate * (total - current)
             }
             next.set(id, {
@@ -116,6 +128,8 @@ export function useArchiveOperations() {
               total,
               label,
               etaMs,
+              bytesProcessed,
+              totalBytes,
             })
           }
 

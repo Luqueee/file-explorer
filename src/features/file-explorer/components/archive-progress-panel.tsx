@@ -5,6 +5,13 @@ import { useArchiveOperations } from "../hooks/use-archive-operations"
 // ETA formatter
 // ---------------------------------------------------------------------------
 
+function formatBytes(bytes: number): string {
+  if (bytes < 1024) return `${bytes} B`
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`
+  if (bytes < 1024 * 1024 * 1024) return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
+  return `${(bytes / (1024 * 1024 * 1024)).toFixed(2)} GB`
+}
+
 function formatEta(ms: number): string {
   if (ms < 5_000) return "terminando..."
   if (ms < 60_000) return `~${Math.round(ms / 1_000)} seg`
@@ -57,11 +64,13 @@ export function ArchiveProgressPanel() {
 
         const Icon = isCompress ? Archive : PackageOpen
         const verb = isCompress ? "Comprimiendo" : "Descomprimiendo"
-        const percent =
-          op.total > 0
-            ? Math.min(100, Math.round((op.current / op.total) * 100))
-            : 0
-        const indeterminate = op.total < 0 || op.current === 0
+        const hasByteProgress = op.totalBytes > 0
+        const percent = hasByteProgress
+          ? Math.min(100, Math.round((op.bytesProcessed / op.totalBytes) * 100))
+          : op.total > 0
+          ? Math.min(100, Math.round((op.current / op.total) * 100))
+          : 0
+        const indeterminate = !hasByteProgress && (op.total < 0 || op.current === 0)
 
         return (
           <div
@@ -107,16 +116,18 @@ export function ArchiveProgressPanel() {
             {/* Stats row */}
             <div className="flex justify-between text-[11px] text-muted-foreground">
               <span>
-                {indeterminate
+                {hasByteProgress
+                  ? formatBytes(op.bytesProcessed)
+                  : indeterminate
                   ? `${op.current} entradas`
                   : `${op.current} / ${op.total}`}
               </span>
               <span>
-                {!indeterminate && op.etaMs != null
+                {op.etaMs != null && !indeterminate
                   ? formatEta(op.etaMs)
-                  : !indeterminate
-                    ? `${percent}%`
-                    : null}
+                  : !indeterminate || hasByteProgress
+                  ? `${percent}%`
+                  : null}
               </span>
             </div>
           </div>

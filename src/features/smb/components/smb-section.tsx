@@ -1,5 +1,13 @@
 import { useState } from "react"
-import { Network, Plus, Unplug, Plug, Pencil, Trash2, Loader2 } from "lucide-react"
+import {
+  Network,
+  Plus,
+  Unplug,
+  Plug,
+  Pencil,
+  Trash2,
+  Loader2,
+} from "lucide-react"
 import {
   SidebarGroup,
   SidebarGroupAction,
@@ -68,16 +76,13 @@ export function SmbSection({ currentPath, onNavigate }: Props) {
     <>
       <SidebarGroup>
         <SidebarGroupLabel>Red</SidebarGroupLabel>
-        <SidebarGroupAction
-          title="Añadir share SMB"
-          onClick={openNew}
-        >
+        <SidebarGroupAction title="Añadir share SMB" onClick={openNew}>
           <Plus />
         </SidebarGroupAction>
         <SidebarMenu>
           {shares.length === 0 && (
             <li className="px-2 py-1 text-xs text-muted-foreground">
-              Sin shares. Añadí uno con +.
+              Sin shares. Añade uno con +.
             </li>
           )}
           {shares.map((s) => {
@@ -111,7 +116,10 @@ export function SmbSection({ currentPath, onNavigate }: Props) {
                       <span className="text-xs">⋯</span>
                     </SidebarMenuAction>
                   </DropdownMenuTrigger>
-                  <DropdownMenuContent align="end" onClick={(e) => e.stopPropagation()}>
+                  <DropdownMenuContent
+                    align="end"
+                    onClick={(e) => e.stopPropagation()}
+                  >
                     {isMounted ? (
                       <DropdownMenuItem onClick={() => handleUnmount(s)}>
                         <Unplug className="h-4 w-4" />
