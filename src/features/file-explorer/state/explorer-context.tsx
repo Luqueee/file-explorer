@@ -45,6 +45,7 @@ import { tagsGateway } from "@/features/tags/infra/tags.gateway"
 import { useExplorerHotkeys } from "../hooks/use-explorer-hotkeys"
 import { BulkRenameModal } from "../components/bulk-rename-modal"
 import { HashPanel } from "../components/hash-panel"
+import { nativeNotify } from "@/shared/lib/notify"
 
 export type { InlineMode, ViewMode }
 
@@ -339,14 +340,21 @@ export function FileExplorerProvider({
 
   const handlePaste = useCallback(async () => {
     if (!clipboard) return
+    const count = clipboard.paths.length
     await ops.paste(clipboard, path)
     if (clipboard.op === "cut") clearClipboard()
+    if (count > 1) {
+      const verb = clipboard.op === "cut" ? "movidos" : "copiados"
+      nativeNotify(`${count} archivos ${verb}`, path)
+    }
   }, [clipboard, ops, path, clearClipboard])
 
   const compress = useCallback(
     async (paths: string[], format?: string, level?: string) => {
       if (paths.length === 0) return
       await ops.compress(paths, path, undefined, format, level)
+      const name = paths.length === 1 ? paths[0].split("/").at(-1) : `${paths.length} archivos`
+      nativeNotify("Compresión completada", name)
     },
     [ops, path]
   )

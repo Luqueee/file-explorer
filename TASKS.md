@@ -49,7 +49,7 @@ Legend: 🔴 bug/debt · 🟣 feature · 🔄 refactor · ⚡ UX · 🧪 testing
 - [x] **Drag preview con count** — badge con cantidad al arrastrar N archivos.
 - [x] **Atajos visibles en menús** — mostrar binding de hotkey al lado de cada acción de context menu.
 - [ ] **Onboarding tour** — primera vez: highlight de features clave.
-- [ ] **Notificaciones nativas macOS** — al terminar archive/copy largo en background.
+- [x] **Notificaciones nativas macOS** — al terminar archive/copy largo en background.
 
 ---
 
