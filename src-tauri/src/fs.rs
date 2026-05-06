@@ -273,6 +273,41 @@ pub fn rename_entry(src: String, new_name: String) -> Result<(), String> {
     std::fs::rename(src_path, &dest).map_err(|e| e.to_string())
 }
 
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct RenameOp {
+    pub src: String,
+    pub new_name: String,
+}
+
+/// Rename multiple entries atomically (validate all first, then execute) + list parent.
+#[tauri::command]
+pub fn rename_entries(
+    renames: Vec<RenameOp>,
+    options: Option<ListOptions>,
+) -> Result<DirectoryPage, String> {
+    if renames.is_empty() {
+        return Err("No hay operaciones de renombrado".to_string());
+    }
+    for op in &renames {
+        validate_filename(&op.new_name)?;
+        let src_path = Path::new(&op.src);
+        reject_traversal(src_path)?;
+        let parent = src_path.parent().ok_or("Sin directorio padre")?;
+        let dest = parent.join(&op.new_name);
+        ensure_within(parent, &dest)?;
+    }
+    for op in &renames {
+        let src_path = Path::new(&op.src);
+        let parent = src_path.parent().unwrap();
+        let dest = parent.join(&op.new_name);
+        std::fs::rename(src_path, &dest).map_err(|e| e.to_string())?;
+    }
+    let first_src = Path::new(&renames[0].src);
+    let parent = first_src.parent().ok_or("Sin directorio padre")?;
+    list_directory(parent.to_string_lossy().to_string(), options)
+}
+
 /// Rename + list parent in one roundtrip — saves a separate list_directory call.
 #[tauri::command]
 pub fn rename_and_list(

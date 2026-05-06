@@ -173,6 +173,7 @@ export function FileContextMenu() {
     cut,
     handlePaste,
     startRename,
+    startBulkRename,
     setDeleteTargets,
     startNewFolder,
     startNewFile,
@@ -196,6 +197,7 @@ export function FileContextMenu() {
       cut={cut}
       handlePaste={handlePaste}
       startRename={startRename}
+      startBulkRename={startBulkRename}
       setDeleteTargets={setDeleteTargets}
       startNewFolder={startNewFolder}
       startNewFile={startNewFile}
@@ -220,6 +222,7 @@ interface BodyProps {
   cut: ReturnType<typeof useFileExplorer>["cut"]
   handlePaste: ReturnType<typeof useFileExplorer>["handlePaste"]
   startRename: ReturnType<typeof useFileExplorer>["startRename"]
+  startBulkRename: ReturnType<typeof useFileExplorer>["startBulkRename"]
   setDeleteTargets: ReturnType<typeof useFileExplorer>["setDeleteTargets"]
   startNewFolder: ReturnType<typeof useFileExplorer>["startNewFolder"]
   startNewFile: ReturnType<typeof useFileExplorer>["startNewFile"]
@@ -253,6 +256,7 @@ function ContextMenuBody({
   reveal,
   copyPathToClipboard,
   runInTerminal,
+  startBulkRename,
 }: BodyProps) {
   const entry = contextMenu.entry
   const targetPaths =
@@ -388,15 +392,26 @@ function ContextMenuBody({
               }}
             />
             <MenuDivider />
-            <MenuItem
-              icon={<Pencil className="h-3.5 w-3.5" />}
-              label="Renombrar"
-              shortcut="F2"
-              onClick={() => {
-                startRename(entry)
-                closeContextMenu()
-              }}
-            />
+            {targetPaths.length > 1 ? (
+              <MenuItem
+                icon={<Pencil className="h-3.5 w-3.5" />}
+                label={`Renombrar ${targetPaths.length} archivos…`}
+                onClick={() => {
+                  startBulkRename(targetEntries)
+                  closeContextMenu()
+                }}
+              />
+            ) : (
+              <MenuItem
+                icon={<Pencil className="h-3.5 w-3.5" />}
+                label="Renombrar"
+                shortcut="F2"
+                onClick={() => {
+                  startRename(entry)
+                  closeContextMenu()
+                }}
+              />
+            )}
             <MenuDivider />
             <button
               role="menuitem"

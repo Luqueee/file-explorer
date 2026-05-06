@@ -43,6 +43,7 @@ import { useUndoStack } from "@/features/filesystem/api/use-undo-stack"
 import { describeUndoOp } from "@/features/filesystem/domain/undo-op"
 import { tagsGateway } from "@/features/tags/infra/tags.gateway"
 import { useExplorerHotkeys } from "../hooks/use-explorer-hotkeys"
+import { BulkRenameModal } from "../components/bulk-rename-modal"
 
 export type { InlineMode, ViewMode }
 
@@ -149,6 +150,11 @@ interface Value {
   undo: () => Promise<void>
 
   tagFilter: string | null
+
+  bulkRenameEntries: FileEntry[] | null
+  startBulkRename: (entries: FileEntry[]) => void
+  cancelBulkRename: () => void
+  commitBulkRename: (renames: Array<{ src: string; newName: string }>) => Promise<void>
 }
 
 const Ctx = createContext<Value | null>(null)
@@ -396,6 +402,17 @@ export function FileExplorerProvider({
   const openQuickLook = useCallback((e: FileEntry) => setQuickLookEntry(e), [])
   const closeQuickLook = useCallback(() => setQuickLookEntry(null), [])
 
+  const [bulkRenameEntries, setBulkRenameEntries] = useState<FileEntry[] | null>(null)
+  const startBulkRename = useCallback((e: FileEntry[]) => setBulkRenameEntries(e), [])
+  const cancelBulkRename = useCallback(() => setBulkRenameEntries(null), [])
+  const commitBulkRename = useCallback(
+    async (renames: Array<{ src: string; newName: string }>) => {
+      setBulkRenameEntries(null)
+      await ops.renameMany(renames)
+    },
+    [ops]
+  )
+
   const confirmDelete = useCallback(async () => {
     if (deleteTargets.length === 0) return
     const targets = deleteTargets
@@ -616,6 +633,10 @@ export function FileExplorerProvider({
       undoLabel: undoStack.peek ? describeUndoOp(undoStack.peek) : null,
       undo,
       tagFilter,
+      bulkRenameEntries,
+      startBulkRename,
+      cancelBulkRename,
+      commitBulkRename,
     }),
     [
       path,
@@ -694,6 +715,10 @@ export function FileExplorerProvider({
       undoStack.peek,
       undo,
       tagFilter,
+      bulkRenameEntries,
+      startBulkRename,
+      cancelBulkRename,
+      commitBulkRename,
     ]
   )
 
@@ -726,6 +751,13 @@ export function FileExplorerProvider({
           )}
         </DragOverlay>
       </DndContext>
+      {bulkRenameEntries && (
+        <BulkRenameModal
+          entries={bulkRenameEntries}
+          onCommit={commitBulkRename}
+          onCancel={cancelBulkRename}
+        />
+      )}
     </Ctx.Provider>
   )
 }

@@ -55,6 +55,31 @@ export function useFileOps(
       })
     },
 
+    renameMany: (renames: Array<{ src: string; newName: string }>) => {
+      if (onEntries) {
+        return (async () => {
+          try {
+            const page = await fsGateway.renameBulk(renames)
+            fsGateway.clearIndex().catch(() => {})
+            for (const { src, newName } of renames) {
+              const parentDir = src.slice(0, src.lastIndexOf("/"))
+              undoStack.push({ type: "rename", oldPath: src, newPath: `${parentDir}/${newName}` })
+            }
+            onEntries(page.entries, page.total)
+          } catch (e) {
+            setOpError(fsErrorMessage(e))
+          }
+        })()
+      }
+      return wrap(async () => {
+        await fsGateway.renameBulk(renames)
+        for (const { src, newName } of renames) {
+          const parentDir = src.slice(0, src.lastIndexOf("/"))
+          undoStack.push({ type: "rename", oldPath: src, newPath: `${parentDir}/${newName}` })
+        }
+      })
+    },
+
     remove: (path: string) => wrap(() => fsGateway.delete(path)),
 
     mkdir: (parent: string, name: string) =>

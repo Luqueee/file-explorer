@@ -77,6 +77,11 @@ export const fsGateway = {
       newName,
       options: options ?? null,
     }),
+  renameBulk: (
+    renames: Array<{ src: string; newName: string }>,
+    options?: { limit?: number; offset?: number; sortBy?: SortBy; sortDir?: SortDir }
+  ) =>
+    invoke<DirectoryPage>("rename_entries", { renames, options: options ?? null }),
   delete: (path: string) => invoke<void>("delete_entry", { path }),
   deleteMany: (paths: string[]) =>
     invoke<void>("delete_entries", { paths }),
