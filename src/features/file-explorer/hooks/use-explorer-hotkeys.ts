@@ -278,7 +278,7 @@ export function useExplorerHotkeys({
     function onKeyDown(e: KeyboardEvent) {
       if (inlineMode) return
       if (e.ctrlKey || e.metaKey || e.altKey) return
-      if (e.key.length !== 1) return
+      if (e.key.length !== 1 || e.key.trim() === "") return
       if (document.activeElement === filterRef.current) return
       const tag = (document.activeElement as HTMLElement)?.tagName?.toLowerCase()
       if (tag === "input" || tag === "textarea") return

@@ -63,9 +63,9 @@ Legend: 🔴 bug/debt · 🟣 feature · 🔄 refactor · ⚡ UX · 🧪 testing
 
 ## 📦 Distribución
 
-- [ ] **Universal binary macOS** — Intel + Apple Silicon en mismo bundle.
-- [ ] **Notarización + DMG branded** — pipeline de release.
-- [ ] **Homebrew cask** — `brew install --cask kenafold`.
+- [x] **Universal binary macOS** — Intel + Apple Silicon en mismo bundle.
+- [x] **Notarización + DMG branded** — pipeline de release.
+- [x] **Homebrew cask** — `brew install --cask kenafold`.
 
 ---
 
