@@ -19,6 +19,8 @@ import { useFavorites } from "@/features/navigation/api/use-favorites"
 import {
   readLastPath,
   writeLastPath,
+  readSession,
+  writeSession,
 } from "@/features/file-explorer/hooks/use-explorer-prefs"
 import { ArchiveProgressPanel } from "@/features/file-explorer/components/archive-progress-panel"
 import { TrashPanel } from "@/features/file-explorer/components/trash-panel"
@@ -52,11 +54,17 @@ export default function App() {
 
   useEffect(() => {
     if (homeDir && panes.length === 0) {
-      const id = "p-1"
       // One-time initialization from async homeDir — cascading render is intentional.
       /* eslint-disable react-hooks/set-state-in-effect */
-      setPanes([{ id, initialPath: readLastPath() ?? homeDir }])
-      setActiveId(id)
+      const session = readSession()
+      if (session && session.panes.length > 0) {
+        setPanes(session.panes.map((p) => ({ id: p.id, initialPath: p.path })))
+        setActiveId(session.activeId)
+      } else {
+        const id = "p-1"
+        setPanes([{ id, initialPath: readLastPath() ?? homeDir }])
+        setActiveId(id)
+      }
       /* eslint-enable react-hooks/set-state-in-effect */
     }
   }, [homeDir, panes.length])
@@ -126,6 +134,14 @@ export default function App() {
   useEffect(() => {
     if (activePath) writeLastPath(activePath)
   }, [activePath])
+
+  useEffect(() => {
+    if (panes.length === 0 || Object.keys(pathByPane).length === 0) return
+    writeSession({
+      panes: panes.map((p) => ({ id: p.id, path: pathByPane[p.id] ?? p.initialPath })),
+      activeId,
+    })
+  }, [panes, pathByPane, activeId])
 
   const handleOpenFile = useCallback((p: string) => {
     fsGateway.open(p).catch((e) => logger.error("open failed", e))

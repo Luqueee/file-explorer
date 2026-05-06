@@ -23,7 +23,7 @@ Legend: 🔴 bug/debt · 🟣 feature · 🔄 refactor · ⚡ UX · 🧪 testing
 - [x] **Trash/papelera nativa** — usar crate `trash` en Rust. Restore desde UI.
 - [x] **Mass tagging por extensión** — seleccionar todos `.pdf` en árbol y aplicar tag.
 - [x] **Preview de código con syntax highlight** — shiki para `.ts/.rs/.py/.md`.
-- [ ] **Sesiones persistidas** — restaurar paneles abiertos al reabrir app.
+- [x] **Sesiones persistidas** — restaurar paneles abiertos al reabrir app.
 - [ ] **Comandos personalizados** — user define shell command en settings, aparece en context menu (ej. "Open in iTerm").
 - [ ] **Filtros guardados** — query del search palette → bookmark reutilizable.
 - [ ] **Comparar imágenes lado-a-lado** — viewer dual.

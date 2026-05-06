@@ -2,6 +2,20 @@ import { useCallback, useState } from "react"
 import type { SortBy, SortDir } from "@/features/filesystem/infra/fs.gateway"
 
 const PATH_KEY = "file-explorer:last-path"
+const SESSION_KEY = "file-explorer:session"
+
+interface Session {
+  panes: Array<{ id: string; path: string }>
+  activeId: string
+}
+
+export function readSession(): Session | null {
+  return readJson<Session | null>(SESSION_KEY, null)
+}
+
+export function writeSession(session: Session) {
+  writeJson(SESSION_KEY, session)
+}
 const SORT_KEY = "file-explorer:sort"
 const HIDDEN_KEY = "file-explorer:show-hidden"
 interface SortPref {
