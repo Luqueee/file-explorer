@@ -6,6 +6,23 @@ A fast, keyboard-driven file manager for macOS, built with Tauri 2 + React 19.
 
 ---
 
+## Installation
+
+```bash
+brew install --cask luqueee/kenafold/kenafold
+```
+
+First time? Add the tap once:
+
+```bash
+brew tap luqueee/kenafold
+brew install --cask kenafold
+```
+
+Requires macOS 13 Ventura or later.
+
+---
+
 ## Features
 
 - **Dual-pane layout** with multi-tab navigation per pane
