@@ -451,7 +451,7 @@ function ContextMenuBody({
                   rect.top + TAG_PICKER_H > window.innerHeight - 8
                     ? Math.max(8, window.innerHeight - 8 - TAG_PICKER_H)
                     : rect.top
-                setTagPickerPos({ x, y: y - 132 })
+                setTagPickerPos(tagPickerPos ? null : { x, y: y - 132 })
               }}
               className="flex w-full items-center gap-2.5 px-3 py-1.5 text-left text-sm hover:bg-accent"
             >
@@ -459,6 +459,7 @@ function ContextMenuBody({
                 <Tag className="h-3.5 w-3.5" />
               </span>
               <span className="flex-1">Etiquetar</span>
+              <ChevronRight className="h-3.5 w-3.5 text-muted-foreground" />
             </button>
             <MenuDivider />
             <MenuItem
@@ -509,10 +510,7 @@ function ContextMenuBody({
           paths={targetPaths}
           x={tagPickerPos.x}
           y={tagPickerPos.y}
-          onClose={() => {
-            setTagPickerPos(null)
-            closeContextMenu()
-          }}
+          onClose={() => setTagPickerPos(null)}
         />
       )}
       {compressMenuPos && (
