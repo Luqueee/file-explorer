@@ -28,6 +28,8 @@ import { useSavedSearches } from "@/features/search/api/use-saved-searches"
 import { useClipboard } from "@/features/filesystem/api/use-clipboard"
 import { logger } from "@/shared/lib/logger"
 import { TagsProvider } from "@/features/tags/api/tags-context"
+import { OnboardingTour } from "@/features/onboarding/components/onboarding-tour"
+import { useOnboarding } from "@/features/onboarding/hooks/use-onboarding"
 
 const sidebarStyle = {
   "--sidebar-width": "calc(var(--spacing) * 56)",
@@ -186,6 +188,7 @@ export default function App() {
 
   const [headerEl, setHeaderEl] = useState<HTMLDivElement | null>(null)
   const [filterEl, setFilterEl] = useState<HTMLDivElement | null>(null)
+  const onboarding = useOnboarding()
 
   return (
     <TagsProvider>
@@ -277,6 +280,7 @@ export default function App() {
         isSaved={isSaved}
       />
 
+      {onboarding.open && <OnboardingTour onDismiss={onboarding.dismiss} />}
       <ArchiveProgressPanel />
       <Toaster position="bottom-right" richColors closeButton />
     </TagsProvider>
