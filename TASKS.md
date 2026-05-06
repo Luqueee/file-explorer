@@ -44,7 +44,7 @@ Legend: 🔴 bug/debt · 🟣 feature · 🔄 refactor · ⚡ UX · 🧪 testing
 
 ## ⚡ UX / Pulido
 
-- [ ] **Multi-tab por pane** — chrome-style tabs dentro de cada pane.
+- [x] **Multi-tab por pane** — chrome-style tabs dentro de cada pane.
 - [x] **Quick filter inline** — type-ahead en pane sin abrir search palette.
 - [x] **Drag preview con count** — badge con cantidad al arrastrar N archivos.
 - [x] **Atajos visibles en menús** — mostrar binding de hotkey al lado de cada acción de context menu.
@@ -63,7 +63,6 @@ Legend: 🔴 bug/debt · 🟣 feature · 🔄 refactor · ⚡ UX · 🧪 testing
 
 ## 📦 Distribución
 
-- [ ] **Auto-updater Tauri** — `tauri-plugin-updater`.
 - [ ] **Universal binary macOS** — Intel + Apple Silicon en mismo bundle.
 - [ ] **Notarización + DMG branded** — pipeline de release.
 - [ ] **Homebrew cask** — `brew install --cask kenafold`.
