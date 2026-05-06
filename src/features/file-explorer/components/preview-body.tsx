@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react"
+import { CodePreview } from "./code-preview"
 import { ChevronRight, File, FileQuestion, Folder, Loader2 } from "lucide-react"
 import { convertFileSrc } from "@tauri-apps/api/core"
 import { fsGateway, type ArchiveEntry, type Preview } from "@/features/filesystem/infra/fs.gateway"
@@ -111,18 +112,12 @@ function PreviewKind({
       return <PdfPreview src={assetSrc} compact={compact} />
     case "text":
       return (
-        <pre
-          className={`w-full overflow-auto rounded bg-muted/40 p-3 font-mono whitespace-pre-wrap ${
-            compact ? "max-h-full text-[11px]" : "max-h-[70vh] text-xs"
-          }`}
-        >
-          {preview.content}
-          {preview.truncated && (
-            <span className="mt-3 block text-muted-foreground italic">
-              … (contenido truncado)
-            </span>
-          )}
-        </pre>
+        <CodePreview
+          path={path}
+          content={preview.content}
+          truncated={preview.truncated}
+          compact={compact}
+        />
       )
     case "unsupported":
       return (
