@@ -10,9 +10,6 @@ import {
   type ReactNode,
   type MouseEvent as ReactMouseEvent,
 } from "react"
-import { useHotkey, type UseHotkeyOptions } from "@tanstack/react-hotkeys"
-import { useAction } from "@/features/hotkeys/bindings"
-import type { HotkeyActionId } from "@/features/hotkeys/registry"
 import { DndContext, DragOverlay } from "@dnd-kit/core"
 import { toast } from "sonner"
 import { useDirectory } from "@/features/filesystem/api/use-directory"
@@ -29,7 +26,6 @@ import {
   type PathSegment,
 } from "@/features/filesystem/domain/path"
 import type { FileEntry } from "@/features/filesystem/domain/file-entry"
-import { isShellScript } from "@/features/filesystem/domain/file-entry"
 import { isMacJunk } from "@/features/filesystem/domain/mac-junk"
 import type { Clipboard } from "@/features/filesystem/domain/clipboard"
 import type { ContextMenuState } from "../types"
@@ -42,6 +38,7 @@ import { useSelection, modeFromEvent } from "../hooks/use-selection"
 import { useUndoStack } from "@/features/filesystem/api/use-undo-stack"
 import { describeUndoOp } from "@/features/filesystem/domain/undo-op"
 import { tagsGateway } from "@/features/tags/infra/tags.gateway"
+import { useExplorerHotkeys } from "../hooks/use-explorer-hotkeys"
 
 export type { InlineMode, ViewMode }
 
@@ -136,7 +133,6 @@ interface Value {
   showHidden: boolean
   setShowHidden: (v: boolean) => void
 
-
   quickLookEntry: FileEntry | null
   openQuickLook: (entry: FileEntry) => void
   closeQuickLook: () => void
@@ -225,7 +221,6 @@ export function FileExplorerProvider({
   const { viewMode, setViewMode } = useViewMode()
   const inline = useInlineEditing(path, entries, ops)
 
-  // Refs let callbacks always see latest data without being in deps → stable references.
   const entriesRef = useRef<readonly FileEntry[]>(entries)
   const selectedPathsRef = useRef<ReadonlySet<string>>(selection.selectedPaths)
   const keyboardHeadRef = useRef<string | null>(null)
@@ -261,8 +256,6 @@ export function FileExplorerProvider({
       : visibleEntries
   }, [visibleEntries, filterQuery, tagFilter, taggedEntries])
 
-  // Destructured to keep effect deps as primitives (pendingSelect) and a stable
-  // callback (clearPendingSelect), avoiding the whole `inline` object as a dep.
   const { pendingSelect, clearPendingSelect } = inline
   useEffect(() => {
     if (!pendingSelect || entries.length === 0) return
@@ -290,7 +283,6 @@ export function FileExplorerProvider({
     e.preventDefault()
     e.stopPropagation()
     if (entry) {
-      // Keep multi-selection when Ctrl is held or entry is already selected.
       const alreadySelected = selectedPathsRef.current.has(entry.path)
       if (!e.ctrlKey && !alreadySelected) setSelected(entry.path)
     }
@@ -383,120 +375,6 @@ export function FileExplorerProvider({
       ?.scrollIntoView({ block: "nearest" })
   }, [])
 
-  const useActiveAction = (
-    id: HotkeyActionId,
-    fn: (e: KeyboardEvent) => void,
-    opts?: UseHotkeyOptions
-  ) => {
-    useAction(id, fn, { ...opts, enabled: active && (opts?.enabled ?? true) })
-  }
-
-  useHotkey("Escape", () => {
-    if (contextMenu) return setContextMenu(null)
-    if (deleteTargets.length > 0) return setDeleteTargets([])
-    if (inline.inlineMode) return inline.cancelInline()
-    if (document.activeElement === filterRef.current) {
-      setFilterQuery("")
-      filterRef.current?.blur()
-      return
-    }
-    if (selection.selectedPaths.size > 1) selection.clear()
-  }, { ignoreInputs: false, preventDefault: false })
-
-  useActiveAction("filter.focus", () => {
-    filterRef.current?.focus()
-  })
-
-  useActiveAction("file.copy", () => {
-    const sel = selectedEntries()
-    if (sel.length > 0) copy(sel.map((e) => e.path))
-  }, { enabled: navEnabled && !!selEntry, ignoreInputs: true })
-
-  useActiveAction("file.cut", () => {
-    const sel = selectedEntries()
-    if (sel.length > 0) cut(sel.map((e) => e.path))
-  }, { enabled: navEnabled && !!selEntry, ignoreInputs: true })
-
-  useActiveAction("file.paste", () => {
-    if (clipboard) handlePaste()
-  }, { enabled: navEnabled && !!clipboard, ignoreInputs: true })
-
-  useActiveAction("file.rename", () => {
-    if (selEntry) inline.startRename(selEntry)
-  }, { enabled: navEnabled && !!selEntry })
-
-  useActiveAction("file.delete", () => {
-    const sel = selectedEntries()
-    if (sel.length > 0) setDeleteTargets(sel)
-  }, { enabled: navEnabled && !!selEntry })
-
-  useHotkey("Mod+Backspace", () => {
-    const sel = selectedEntries()
-    if (sel.length > 0) setDeleteTargets(sel)
-  }, { enabled: active && navEnabled && !!selEntry })
-
-  useAction("file.duplicate", () => {
-    const sel = selectedEntries()
-    for (const entry of sel) duplicate(entry.path)
-  }, { enabled: navEnabled && !!selEntry, ignoreInputs: true })
-
-  useAction("file.copyPath", () => {
-    if (selEntry) copyPathToClipboard(selEntry.path)
-  }, { enabled: navEnabled && !!selEntry, ignoreInputs: true })
-
-  useAction("file.reveal", () => {
-    if (selEntry) reveal(selEntry.path)
-  }, { enabled: navEnabled && !!selEntry, ignoreInputs: true })
-
-  useAction("file.runInTerminal", () => {
-    if (selEntry && isShellScript(selEntry)) runInTerminal(selEntry.path)
-  }, {
-    enabled: navEnabled && !!selEntry && (selEntry ? isShellScript(selEntry) : false),
-    ignoreInputs: true,
-  })
-
-  useActiveAction("file.newFile", () => {
-    inline.startNewFile()
-  }, { enabled: navEnabled, ignoreInputs: true })
-
-  useActiveAction("file.newFolder", () => {
-    inline.startNewFolder()
-  }, { enabled: navEnabled, ignoreInputs: true })
-
-  useActiveAction("history.undo", async () => {
-    await undoStack.undo()
-    await reload()
-  }, { enabled: undoStack.canUndo, ignoreInputs: true })
-
-  useActiveAction("view.reload", () => {
-    reload()
-  }, { ignoreInputs: true })
-
-  useActiveAction("view.list", () => {
-    setViewMode("list")
-  }, { ignoreInputs: true })
-
-  useActiveAction("view.grid", () => {
-    setViewMode("grid")
-  }, { ignoreInputs: true })
-
-  useActiveAction("view.settings", () => {
-    onOpenSettings()
-  }, { ignoreInputs: true })
-
-  useActiveAction("view.quickLook", () => {
-    if (quickLookEntry) {
-      closeQuickLook()
-      return
-    }
-    if (selEntry && !selEntry.is_dir) openQuickLook(selEntry)
-  }, { enabled: navEnabled || !!quickLookEntry, ignoreInputs: true })
-
-
-  useActiveAction("selection.all", () => {
-    selection.selectAll(filteredEntries.map((en) => en.path))
-  }, { enabled: navEnabled, ignoreInputs: true })
-
   const getGridColumns = () => {
     const innerWidth = (tableRef.current?.clientWidth ?? 0) - 24
     return Math.max(1, Math.floor((innerWidth + 8) / 118))
@@ -524,72 +402,6 @@ export function FileExplorerProvider({
     scrollToSelected(newHead.path)
   }
 
-  const resetKeyboardRefs = () => {
-    keyboardHeadRef.current = null
-    keyboardAnchorRef.current = null
-  }
-
-  useActiveAction("selection.down", () => {
-    if (filteredEntries.length === 0) return
-    resetKeyboardRefs()
-    const step = viewMode === "grid" ? getGridColumns() : 1
-    const idx = selected ? filteredEntries.findIndex((en) => en.path === selected) : -1
-    const next = filteredEntries[Math.min(idx + step, filteredEntries.length - 1)]
-    if (next) { setSelected(next.path); scrollToSelected(next.path) }
-  }, { enabled: navEnabled })
-
-  useActiveAction("selection.up", () => {
-    if (filteredEntries.length === 0) return
-    resetKeyboardRefs()
-    const step = viewMode === "grid" ? getGridColumns() : 1
-    const idx = selected ? filteredEntries.findIndex((en) => en.path === selected) : 0
-    const prev = filteredEntries[Math.max(idx - step, 0)]
-    if (prev) { setSelected(prev.path); scrollToSelected(prev.path) }
-  }, { enabled: navEnabled })
-
-  // Grid-only: left/right single-item navigation (no Meta)
-  useHotkey("ArrowLeft", () => {
-    if (filteredEntries.length === 0) return
-    resetKeyboardRefs()
-    const idx = selected ? filteredEntries.findIndex((en) => en.path === selected) : 0
-    const prev = filteredEntries[Math.max(idx - 1, 0)]
-    if (prev && prev.path !== selected) { setSelected(prev.path); scrollToSelected(prev.path) }
-  }, { enabled: active && navEnabled && viewMode === "grid" })
-
-  useHotkey("ArrowRight", () => {
-    if (filteredEntries.length === 0) return
-    resetKeyboardRefs()
-    const idx = selected ? filteredEntries.findIndex((en) => en.path === selected) : -1
-    const next = filteredEntries[Math.min(idx + 1, filteredEntries.length - 1)]
-    if (next && next.path !== selected) { setSelected(next.path); scrollToSelected(next.path) }
-  }, { enabled: active && navEnabled && viewMode === "grid" })
-
-  useHotkey("Meta+ArrowDown", () => {
-    moveKeyboardHead(1)
-  }, { enabled: active && navEnabled && viewMode !== "grid" })
-
-  useHotkey("Meta+ArrowUp", () => {
-    moveKeyboardHead(-1)
-  }, { enabled: active && navEnabled && viewMode !== "grid" })
-
-  useActiveAction("nav.activate", () => {
-    if (selEntry) handleActivate(selEntry)
-  }, { enabled: navEnabled && !!selEntry })
-
-  useActiveAction("nav.up", () => {
-    const par = parentPath(path)
-    if (par) onNavigate(par)
-  }, { enabled: navEnabled && viewMode !== "grid" })
-
-  useActiveAction("nav.enter", () => {
-    if (selEntry?.is_dir) onNavigate(selEntry.path)
-  }, { enabled: navEnabled && viewMode !== "grid" && !!selEntry?.is_dir })
-
-  const segments = useMemo(() => pathSegments(path), [path])
-  const parent = useMemo(() => parentPath(path), [path])
-  const dirCount = useMemo(() => filteredEntries.filter((e) => e.is_dir).length, [filteredEntries])
-  const fileCount = filteredEntries.length - dirCount
-
   const selectAt = useCallback(
     (p: string, e: { shiftKey: boolean; metaKey: boolean; ctrlKey: boolean }) =>
       selection.select(p, modeFromEvent(e), filteredEntriesRef.current),
@@ -603,6 +415,53 @@ export function FileExplorerProvider({
     await undoStack.undo()
     await reload()
   }, [undoStack, reload])
+
+  useExplorerHotkeys({
+    active,
+    navEnabled,
+    viewMode,
+    path,
+    selected,
+    selEntry,
+    filteredEntries,
+    clipboard,
+    quickLookEntry,
+    inlineMode: inline.inlineMode,
+    selectedEntries,
+    setSelected,
+    selectAll,
+    setFilterQuery,
+    setDeleteTargets,
+    setContextMenu: () => setContextMenu(null),
+    copy,
+    cut,
+    handlePaste,
+    duplicate,
+    copyPathToClipboard,
+    reveal,
+    runInTerminal,
+    handleActivate,
+    inline,
+    undoStack: { canUndo: undoStack.canUndo, undo: async () => { await undoStack.undo(); await reload() } },
+    reload,
+    setViewMode,
+    onOpenSettings,
+    onNavigate,
+    openQuickLook,
+    closeQuickLook,
+    selection,
+    filterRef,
+    keyboardHeadRef,
+    keyboardAnchorRef,
+    scrollToSelected,
+    moveKeyboardHead,
+    getGridColumns,
+  })
+
+  const segments = useMemo(() => pathSegments(path), [path])
+  const parent = useMemo(() => parentPath(path), [path])
+  const dirCount = useMemo(() => filteredEntries.filter((e) => e.is_dir).length, [filteredEntries])
+  const fileCount = filteredEntries.length - dirCount
 
   const value = useMemo((): Value => ({
     path,

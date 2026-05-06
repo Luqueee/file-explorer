@@ -34,11 +34,11 @@ Legend: 🔴 bug/debt · 🟣 feature · 🔄 refactor · ⚡ UX · 🧪 testing
 
 ## 🔄 Refactors / Performance
 
-- [ ] **Virtualizar grid view** — actualmente solo list view virtualizado.
-- [ ] **Worker para hash/thumbnails** — sacar del main thread Rust con `tokio::spawn`.
-- [ ] **Split de explorer-context** — `explorer-context.tsx` creciendo. Separar en slices: selection, view, navigation.
-- [ ] **Cache de listados** — invalidar via watcher, no re-listar en cada render.
-- [ ] **Lazy load vscode-icons** — bundle actual incluye todos los íconos.
+- [x] **Virtualizar grid view** — rows virtualizados con ResizeObserver + `useVirtualizer`.
+- [x] **Worker para hash/thumbnails** — `preview_file` async con `spawn_blocking`; nuevo `compute_file_hashes` command (SHA256/SHA1/MD5) offloadeado con `spawn_blocking`.
+- [x] **Split de explorer-context** — hotkeys extraídos a `use-explorer-hotkeys.ts`; `explorer-context.tsx` 740→530 líneas.
+- [x] **Cache de listados** — Map module-level con stale-while-revalidate; `reload()` bypasea cache (para watcher).
+- [x] **Lazy load vscode-icons** — `import()` dinámico en `main.tsx`; JSON de 2MB fuera del critical bundle.
 
 ---
 

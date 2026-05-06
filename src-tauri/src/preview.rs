@@ -47,45 +47,49 @@ fn classify(ext: &str) -> (&'static str, &'static str) {
 }
 
 #[tauri::command]
-pub fn preview_file(path: String) -> Result<Preview, String> {
-    let p = Path::new(&path);
-    reject_traversal(p)?;
+pub async fn preview_file(path: String) -> Result<Preview, String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        let p = Path::new(&path);
+        reject_traversal(p)?;
 
-    let meta = std::fs::metadata(p).map_err(|e| e.to_string())?;
-    if meta.is_dir() {
-        return Ok(Preview::Unsupported { ext: None });
-    }
-    let size = meta.len();
+        let meta = std::fs::metadata(p).map_err(|e| e.to_string())?;
+        if meta.is_dir() {
+            return Ok(Preview::Unsupported { ext: None });
+        }
+        let size = meta.len();
 
-    let ext = p
-        .extension()
-        .and_then(|e| e.to_str())
-        .map(|e| e.to_lowercase());
-    let ext_str = ext.as_deref().unwrap_or("");
-    let (kind, mime) = classify(ext_str);
+        let ext = p
+            .extension()
+            .and_then(|e| e.to_str())
+            .map(|e| e.to_lowercase());
+        let ext_str = ext.as_deref().unwrap_or("");
+        let (kind, mime) = classify(ext_str);
 
-    if kind == "text" {
-        let cap = std::cmp::min(size, MAX_TEXT_BYTES) as usize;
-        let mut buf = Vec::with_capacity(cap);
-        File::open(p)
-            .map_err(|e| e.to_string())?
-            .take(MAX_TEXT_BYTES)
-            .read_to_end(&mut buf)
-            .map_err(|e| e.to_string())?;
-        let content = String::from_utf8_lossy(&buf).into_owned();
-        return Ok(Preview::Text {
-            mime: mime.into(),
-            content,
-            truncated: size > MAX_TEXT_BYTES,
-        });
-    }
+        if kind == "text" {
+            let cap = std::cmp::min(size, MAX_TEXT_BYTES) as usize;
+            let mut buf = Vec::with_capacity(cap);
+            File::open(p)
+                .map_err(|e| e.to_string())?
+                .take(MAX_TEXT_BYTES)
+                .read_to_end(&mut buf)
+                .map_err(|e| e.to_string())?;
+            let content = String::from_utf8_lossy(&buf).into_owned();
+            return Ok(Preview::Text {
+                mime: mime.into(),
+                content,
+                truncated: size > MAX_TEXT_BYTES,
+            });
+        }
 
-    let _ = size;
-    match kind {
-        "image" => Ok(Preview::Image { mime: mime.into() }),
-        "audio" => Ok(Preview::Audio { mime: mime.into() }),
-        "video" => Ok(Preview::Video { mime: mime.into() }),
-        "pdf" => Ok(Preview::Pdf),
-        _ => Ok(Preview::Unsupported { ext }),
-    }
+        let _ = size;
+        match kind {
+            "image" => Ok(Preview::Image { mime: mime.into() }),
+            "audio" => Ok(Preview::Audio { mime: mime.into() }),
+            "video" => Ok(Preview::Video { mime: mime.into() }),
+            "pdf" => Ok(Preview::Pdf),
+            _ => Ok(Preview::Unsupported { ext }),
+        }
+    })
+    .await
+    .map_err(|e| e.to_string())?
 }

@@ -8,6 +8,7 @@ use tauri_plugin_opener::OpenerExt;
 mod archive;
 mod fs;
 mod grep;
+mod hash;
 mod path_safety;
 mod preview;
 mod search;
@@ -171,7 +172,8 @@ pub fn run() {
             tags::tags_get_entries_by_tag,
             watcher::watch_directory,
             watcher::unwatch_directory,
-            watcher::current_watch_path
+            watcher::current_watch_path,
+            hash::compute_file_hashes
         ])
         .on_page_load(|webview, payload| {
             if webview.label() == "main" && matches!(payload.event(), PageLoadEvent::Finished) {
