@@ -28,6 +28,8 @@ import {
 import { SmbSection } from "@/features/smb/components/smb-section"
 import { useTags } from "@/features/tags/api/tags-context"
 import { fsGateway } from "@/features/filesystem/infra/fs.gateway"
+import type { SavedSearch } from "@/features/search/infra/saved-searches.storage"
+import { Search } from "lucide-react"
 import type { FileEntry } from "@/features/filesystem/domain/file-entry"
 import { cn } from "@/lib/utils"
 
@@ -156,6 +158,9 @@ interface Props extends React.ComponentProps<typeof Sidebar> {
   tagFilter: string | null
   onTagFilter: (tagId: string | null) => void
   onOpenTrash: () => void
+  savedSearches: SavedSearch[]
+  onOpenSavedSearch: (query: string, mode: "name" | "content") => void
+  onRemoveSavedSearch: (id: string) => void
 }
 
 export function AppSidebar({
@@ -167,6 +172,9 @@ export function AppSidebar({
   tagFilter,
   onTagFilter,
   onOpenTrash,
+  savedSearches,
+  onOpenSavedSearch,
+  onRemoveSavedSearch,
   ...props
 }: Props) {
   const { getUsedTags } = useTags()
@@ -240,6 +248,32 @@ export function AppSidebar({
                       <X className="h-3 w-3" />
                     </SidebarMenuAction>
                   )}
+                </SidebarMenuItem>
+              ))}
+            </SidebarMenu>
+          </SidebarGroup>
+        )}
+
+        {savedSearches.length > 0 && (
+          <SidebarGroup>
+            <SidebarGroupLabel>Búsquedas</SidebarGroupLabel>
+            <SidebarMenu>
+              {savedSearches.map((s) => (
+                <SidebarMenuItem key={s.id} className="group/saved">
+                  <SidebarMenuButton onClick={() => onOpenSavedSearch(s.query, s.mode)}>
+                    <Search className="h-3.5 w-3.5 shrink-0" />
+                    <span className="flex-1 truncate">{s.query}</span>
+                    <span className="shrink-0 text-[10px] text-muted-foreground">
+                      {s.mode === "name" ? "nombre" : "contenido"}
+                    </span>
+                  </SidebarMenuButton>
+                  <SidebarMenuAction
+                    onClick={(e) => { e.stopPropagation(); onRemoveSavedSearch(s.id) }}
+                    title="Eliminar búsqueda guardada"
+                    className="hidden group-hover/saved:flex"
+                  >
+                    <X className="h-3 w-3" />
+                  </SidebarMenuAction>
                 </SidebarMenuItem>
               ))}
             </SidebarMenu>

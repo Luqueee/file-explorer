@@ -24,6 +24,7 @@ import {
 } from "@/features/file-explorer/hooks/use-explorer-prefs"
 import { ArchiveProgressPanel } from "@/features/file-explorer/components/archive-progress-panel"
 import { TrashPanel } from "@/features/file-explorer/components/trash-panel"
+import { useSavedSearches } from "@/features/search/api/use-saved-searches"
 import { useClipboard } from "@/features/filesystem/api/use-clipboard"
 import { logger } from "@/shared/lib/logger"
 import { TagsProvider } from "@/features/tags/api/tags-context"
@@ -169,6 +170,8 @@ export default function App() {
   const sidebarFocusPath = activePath ?? homeDir ?? "/"
 
   const [trashOpen, setTrashOpen] = useState(false)
+  const { searches: savedSearches, add: saveSearch, remove: removeSavedSearch, isSaved } = useSavedSearches()
+  const [pendingSearch, setPendingSearch] = useState<{ query: string; mode: "name" | "content" } | null>(null)
   const [tagFilter, setTagFilter] = useState<string | null>(null)
 
   const handleTagFilter = useCallback((tagId: string | null) => {
@@ -205,6 +208,9 @@ export default function App() {
               tagFilter={tagFilter}
               onTagFilter={handleTagFilter}
               onOpenTrash={() => setTrashOpen(true)}
+              savedSearches={savedSearches}
+              onOpenSavedSearch={(q, m) => { setPendingSearch({ query: q, mode: m }); setSearchOpen(true) }}
+              onRemoveSavedSearch={removeSavedSearch}
             />
             <SidebarInset className="flex min-w-0 flex-1 flex-row overflow-hidden">
               {panes.map((p) => (
@@ -258,9 +264,17 @@ export default function App() {
       <SearchPalette
         root={sidebarFocusPath}
         open={searchOpen}
-        onClose={() => setSearchOpen(false)}
+        onClose={() => { setSearchOpen(false); setPendingSearch(null) }}
         onNavigate={navigateActive}
         onOpenFile={handleOpenFile}
+        initialQuery={pendingSearch?.query}
+        initialMode={pendingSearch?.mode}
+        onSave={saveSearch}
+        onUnsave={(q, m) => {
+          const found = savedSearches.find((s) => s.query === q.trim() && s.mode === m)
+          if (found) removeSavedSearch(found.id)
+        }}
+        isSaved={isSaved}
       />
 
       <ArchiveProgressPanel />

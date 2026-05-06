@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react"
-import { Search, FileText, Loader2, CornerDownLeft, FolderOpen } from "lucide-react"
+import { Search, FileText, Loader2, CornerDownLeft, FolderOpen, Bookmark, BookmarkCheck } from "lucide-react"
 import { useGrep, useSearch, useSearchIndex } from "../api/use-search"
 import { FileIcon } from "@/features/file-explorer/components/file-icon"
 import { formatSize, formatDate } from "@/shared/lib/format"
@@ -14,6 +14,11 @@ interface Props {
   onClose: () => void
   onNavigate: (path: string) => void
   onOpenFile: (path: string) => void
+  initialQuery?: string
+  initialMode?: Mode
+  onSave?: (query: string, mode: Mode) => void
+  onUnsave?: (query: string, mode: Mode) => void
+  isSaved?: (query: string, mode: Mode) => boolean
 }
 
 export function SearchPalette({
@@ -22,6 +27,11 @@ export function SearchPalette({
   onClose,
   onNavigate,
   onOpenFile,
+  initialQuery,
+  initialMode,
+  onSave,
+  onUnsave,
+  isSaved,
 }: Props) {
   const [query, setQuery] = useState("")
   const [selected, setSelected] = useState(0)
@@ -50,10 +60,11 @@ export function SearchPalette({
   useEffect(() => {
     if (!open) return
     /* eslint-disable react-hooks/set-state-in-effect */
-    setQuery("")
+    setQuery(initialQuery ?? "")
+    setMode(initialMode ?? "name")
     setSelected(0)
     /* eslint-enable react-hooks/set-state-in-effect */
-  }, [open])
+  }, [open]) // intentionally omit initialQuery/initialMode — only apply on open
 
   useEffect(() => {
     /* eslint-disable react-hooks/set-state-in-effect */
@@ -152,6 +163,22 @@ export function SearchPalette({
           />
           {(loading || (mode === "name" && indexing)) && (
             <Loader2 className="h-3.5 w-3.5 shrink-0 animate-spin text-muted-foreground" />
+          )}
+          {query.trim() && onSave && onUnsave && isSaved && (
+            <button
+              onClick={() =>
+                isSaved(query, mode)
+                  ? onUnsave(query, mode)
+                  : onSave(query, mode)
+              }
+              className="shrink-0 rounded p-1 text-muted-foreground hover:bg-muted hover:text-foreground"
+              title={isSaved(query, mode) ? "Quitar de guardados" : "Guardar búsqueda"}
+            >
+              {isSaved(query, mode)
+                ? <BookmarkCheck className="h-4 w-4 text-primary" />
+                : <Bookmark className="h-4 w-4" />
+              }
+            </button>
           )}
           <ModeTabs mode={mode} setMode={setMode} />
           <kbd className="hidden shrink-0 rounded border border-border/60 bg-muted px-1.5 py-0.5 font-mono text-[10px] text-muted-foreground sm:block">

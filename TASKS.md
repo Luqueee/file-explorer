@@ -25,7 +25,7 @@ Legend: 🔴 bug/debt · 🟣 feature · 🔄 refactor · ⚡ UX · 🧪 testing
 - [x] **Preview de código con syntax highlight** — shiki para `.ts/.rs/.py/.md`.
 - [x] **Sesiones persistidas** — restaurar paneles abiertos al reabrir app.
 - [ ] **Comandos personalizados** — user define shell command en settings, aparece en context menu (ej. "Open in iTerm").
-- [ ] **Filtros guardados** — query del search palette → bookmark reutilizable.
+- [x] **Filtros guardados** — query del search palette → bookmark reutilizable.
 - [ ] **Comparar imágenes lado-a-lado** — viewer dual.
 - [x] **Espacio en disco por carpeta** — tree map o sunburst (estilo Disk Inventory X).
 - [ ] **Integración Git** — badge en archivos dentro de repo (modified/staged/untracked).
