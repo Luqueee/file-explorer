@@ -1,4 +1,5 @@
 use std::path::PathBuf;
+use std::sync::Mutex;
 
 use tauri::webview::PageLoadEvent;
 use tauri::{Manager, TitleBarStyle, WebviewUrl, WebviewWindowBuilder};
@@ -18,6 +19,15 @@ mod system;
 mod tags;
 mod terminal;
 mod watcher;
+
+/// Holds the directory path passed as CLI argument (e.g. `kenafold /some/dir`).
+/// Consumed on first read so subsequent calls return None.
+struct CliPath(Mutex<Option<String>>);
+
+#[tauri::command]
+fn get_cli_path(state: tauri::State<'_, CliPath>) -> Option<String> {
+    state.0.lock().ok()?.take()
+}
 
 fn external_navigation_plugin<R: tauri::Runtime>() -> tauri::plugin::TauriPlugin<R> {
     tauri::plugin::Builder::<R>::new("external-navigation")
@@ -60,6 +70,11 @@ pub fn run() {
         )
         .plugin(tauri_plugin_opener::init())
         .plugin(external_navigation_plugin())
+        .manage(CliPath(Mutex::new(
+            std::env::args()
+                .nth(1)
+                .filter(|p| std::path::Path::new(p).is_dir()),
+        )))
         .setup(|app| {
             let win_builder = WebviewWindowBuilder::new(app, "main", WebviewUrl::default())
                 .title("Kenafold")
@@ -181,7 +196,10 @@ pub fn run() {
             watcher::unwatch_directory,
             watcher::current_watch_path,
             hash::compute_file_hashes,
-            comparator::compare_directories
+            comparator::compare_directories,
+            get_cli_path,
+            fs::cli_is_installed,
+            fs::install_cli
         ])
         .on_page_load(|webview, payload| {
             if webview.label() == "main" && matches!(payload.event(), PageLoadEvent::Finished) {

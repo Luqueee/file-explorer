@@ -23,6 +23,30 @@ Requires macOS 13 Ventura or later.
 
 ---
 
+## CLI
+
+Open Kenafold from the terminal with the `kenafold` command:
+
+```bash
+kenafold              # open at last session path
+kenafold .            # open in the current directory
+kenafold ~/Projects   # open at a specific path
+```
+
+**Install the CLI tool:**
+
+```bash
+sudo ln -sf "/Applications/Kenafold.app/Contents/Resources/scripts/kenafold" /usr/local/bin/kenafold
+```
+
+Or, if you cloned the repo:
+
+```bash
+sudo ln -sf "$PWD/scripts/kenafold" /usr/local/bin/kenafold
+```
+
+---
+
 ## Features
 
 - **Dual-pane layout** with multi-tab navigation per pane

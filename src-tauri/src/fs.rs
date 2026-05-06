@@ -518,3 +518,58 @@ pub async fn disk_usage(path: String) -> Result<Vec<DiskEntry>, String> {
     .await
     .map_err(|e| e.to_string())?
 }
+
+// ---------------------------------------------------------------------------
+// CLI tool installer
+// ---------------------------------------------------------------------------
+
+fn cli_link_path() -> std::path::PathBuf {
+    let home = std::env::var("HOME").unwrap_or_default();
+    std::path::Path::new(&home).join(".local/bin/kenafold")
+}
+
+/// Returns true if the `kenafold` CLI symlink already exists in ~/.local/bin.
+#[tauri::command]
+pub fn cli_is_installed() -> bool {
+    cli_link_path().exists()
+}
+
+/// Creates ~/.local/bin/kenafold → the bundled script inside the .app bundle.
+/// Safe to call multiple times — noop if already installed.
+#[tauri::command]
+pub fn install_cli() -> Result<(), String> {
+    let link = cli_link_path();
+
+    if link.exists() {
+        return Ok(());
+    }
+
+    let exe = std::env::current_exe().map_err(|e| e.to_string())?;
+    let exe_dir = exe.parent().ok_or("no parent")?;
+
+    // In a .app bundle the binary lives at Contents/MacOS/<name>.
+    // Go up one level to Contents/ then into Resources/scripts/.
+    let script = if exe_dir.ends_with("Contents/MacOS") {
+        exe_dir.parent()
+            .ok_or("no Contents dir")?
+            .join("Resources/scripts/kenafold")
+    } else {
+        // Dev mode — binary is in target/debug/ with no bundle structure.
+        return Err(
+            "CLI install only available in a release build (.app bundle)".into(),
+        );
+    };
+
+    if !script.exists() {
+        return Err(format!("script not found at {}", script.display()));
+    }
+
+    if let Some(parent) = link.parent() {
+        std::fs::create_dir_all(parent).map_err(|e| e.to_string())?;
+    }
+
+    #[cfg(unix)]
+    std::os::unix::fs::symlink(&script, &link).map_err(|e| e.to_string())?;
+
+    Ok(())
+}

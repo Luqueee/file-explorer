@@ -191,7 +191,7 @@ fn detect_collisions(sources: &[PathBuf]) -> Result<(), String> {
             .ok_or("Nombre inválido")?;
         if !seen.insert(name) {
             return Err(format!(
-                "Hay archivos con el mismo nombre: {}. Renombrá alguno o comprimí por separado.",
+                "Hay archivos con el mismo nombre: {}. Renombra alguno o comprime por separado.",
                 name
             ));
         }
@@ -360,7 +360,7 @@ fn run_compression_7z(
         return Err("__CANCELLED__".into());
     }
     let cmd_name = find_7z_cmd().ok_or_else(|| {
-        "Comando '7z' no encontrado. Instalá con: brew install sevenzip".to_string()
+        "Comando '7z' no encontrado. Instala con: brew install sevenzip".to_string()
     })?;
 
     let mx = match level {
@@ -425,7 +425,7 @@ fn run_compression_rar(
 
     let output = cmd.output().map_err(|e| {
         if e.kind() == std::io::ErrorKind::NotFound {
-            "Comando 'rar' no encontrado. Instalá con: brew install rar".to_string()
+            "Comando 'rar' no encontrado. Instala con: brew install rar".to_string()
         } else {
             e.to_string()
         }

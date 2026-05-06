@@ -5,6 +5,7 @@ import {
   useState,
   type CSSProperties,
 } from "react"
+import { invoke } from "@tauri-apps/api/core"
 import { useAction } from "@/features/hotkeys/bindings"
 import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar"
 import { AppSidebar } from "@/features/sidebar/components/app-sidebar"
@@ -29,6 +30,7 @@ import { useClipboard } from "@/features/filesystem/api/use-clipboard"
 import { logger } from "@/shared/lib/logger"
 import { TagsProvider } from "@/features/tags/api/tags-context"
 import { OnboardingTour } from "@/features/onboarding/components/onboarding-tour"
+import { CliInstallBanner } from "@/features/file-explorer/components/cli-install-banner"
 import { useOnboarding } from "@/features/onboarding/hooks/use-onboarding"
 
 const sidebarStyle = {
@@ -57,18 +59,23 @@ export default function App() {
 
   useEffect(() => {
     if (homeDir && panes.length === 0) {
-      // One-time initialization from async homeDir — cascading render is intentional.
-      /* eslint-disable react-hooks/set-state-in-effect */
-      const session = readSession()
-      if (session && session.panes.length > 0) {
-        setPanes(session.panes.map((p) => ({ id: p.id, initialPath: p.path })))
-        setActiveId(session.activeId)
-      } else {
-        const id = "p-1"
-        setPanes([{ id, initialPath: readLastPath() ?? homeDir }])
-        setActiveId(id)
-      }
-      /* eslint-enable react-hooks/set-state-in-effect */
+      invoke<string | null>("get_cli_path").then((cliPath) => {
+        if (cliPath) {
+          const id = "p-1"
+          setPanes([{ id, initialPath: cliPath }])
+          setActiveId(id)
+          return
+        }
+        const session = readSession()
+        if (session && session.panes.length > 0) {
+          setPanes(session.panes.map((p) => ({ id: p.id, initialPath: p.path })))
+          setActiveId(session.activeId)
+        } else {
+          const id = "p-1"
+          setPanes([{ id, initialPath: readLastPath() ?? homeDir }])
+          setActiveId(id)
+        }
+      })
     }
   }, [homeDir, panes.length])
 
@@ -215,29 +222,32 @@ export default function App() {
               onOpenSavedSearch={(q, m) => { setPendingSearch({ query: q, mode: m }); setSearchOpen(true) }}
               onRemoveSavedSearch={removeSavedSearch}
             />
-            <SidebarInset className="flex min-w-0 flex-1 flex-row overflow-hidden">
-              {panes.map((p) => (
-                <Pane
-                  key={p.id}
-                  paneId={p.id}
-                  initialPath={p.initialPath}
-                  isActive={p.id === activeId}
-                  showActiveRing={panes.length > 1 && p.id === activeId}
-                  onActivate={() => setActiveId(p.id)}
-                  onClose={panes.length > 1 ? () => closePane(p.id) : null}
-                  isFavoriteFn={isFavorite}
-                  onAddFavorite={add}
-                  onOpenSearch={() => setSearchOpen(true)}
-                  onOpenSettings={() => setSettingsOpen(true)}
-                  terminalId={settings.terminalId}
-                  registerNav={registerNav}
-                  onPathChange={onPathChange}
-                  clipboardApi={clipboardApi}
-                  headerContainer={headerEl}
-                  filterContainer={filterEl}
-                  tagFilter={p.id === activeId ? tagFilter : null}
-                />
-              ))}
+            <SidebarInset className="flex min-w-0 flex-1 flex-col overflow-hidden">
+              <CliInstallBanner />
+              <div className="flex min-h-0 flex-1 flex-row overflow-hidden">
+                {panes.map((p) => (
+                  <Pane
+                    key={p.id}
+                    paneId={p.id}
+                    initialPath={p.initialPath}
+                    isActive={p.id === activeId}
+                    showActiveRing={panes.length > 1 && p.id === activeId}
+                    onActivate={() => setActiveId(p.id)}
+                    onClose={panes.length > 1 ? () => closePane(p.id) : null}
+                    isFavoriteFn={isFavorite}
+                    onAddFavorite={add}
+                    onOpenSearch={() => setSearchOpen(true)}
+                    onOpenSettings={() => setSettingsOpen(true)}
+                    terminalId={settings.terminalId}
+                    registerNav={registerNav}
+                    onPathChange={onPathChange}
+                    clipboardApi={clipboardApi}
+                    headerContainer={headerEl}
+                    filterContainer={filterEl}
+                    tagFilter={p.id === activeId ? tagFilter : null}
+                  />
+                ))}
+              </div>
             </SidebarInset>
           </div>
         </SidebarProvider>

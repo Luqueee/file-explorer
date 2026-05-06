@@ -1,0 +1,29 @@
+#!/bin/sh
+# kenafold — open Kenafold file manager from the terminal
+#
+# Install (symlink into PATH):
+#   sudo ln -sf "$PWD/scripts/kenafold" /usr/local/bin/kenafold
+#
+# Usage:
+#   kenafold              # open Kenafold at the last session path
+#   kenafold .            # open in the current directory
+#   kenafold /some/dir    # open at an absolute path
+
+APP_NAME="Kenafold"
+
+if [ $# -eq 0 ]; then
+  open -a "$APP_NAME"
+  exit $?
+fi
+
+if [ -d "$1" ]; then
+  TARGET="$(cd "$1" && pwd)"
+elif [ -f "$1" ]; then
+  # File passed → open its parent directory
+  TARGET="$(cd "$(dirname "$1")" && pwd)"
+else
+  echo "kenafold: no such file or directory: $1" >&2
+  exit 1
+fi
+
+open -a "$APP_NAME" --args "$TARGET"

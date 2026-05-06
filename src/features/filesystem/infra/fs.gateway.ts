@@ -150,4 +150,6 @@ export const fsGateway = {
       pathA: string | null
       pathB: string | null
     }>>("compare_directories", { dirA, dirB }),
+  cliIsInstalled: () => invoke<boolean>("cli_is_installed"),
+  installCli: () => invoke<void>("install_cli"),
 }

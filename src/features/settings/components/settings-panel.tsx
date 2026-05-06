@@ -1,4 +1,6 @@
-import { RefreshCw, Terminal } from "lucide-react"
+import { RefreshCw, Terminal, Check } from "lucide-react"
+import { useState, useEffect } from "react"
+import { fsGateway } from "@/features/filesystem/infra/fs.gateway"
 import { Button } from "@/components/ui/button"
 import {
   Sheet,
@@ -101,6 +103,8 @@ export function SettingsPanel({
                 </ul>
               )}
             </section>
+
+            <CliSection />
           </TabsContent>
 
           <TabsContent value="hotkeys" className="m-0 min-h-0 overflow-auto">
@@ -109,5 +113,60 @@ export function SettingsPanel({
         </Tabs>
       </SheetContent>
     </Sheet>
+  )
+}
+
+function CliSection() {
+  const [installed, setInstalled] = useState<boolean | null>(null)
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  useEffect(() => {
+    fsGateway.cliIsInstalled().then(setInstalled)
+  }, [])
+
+  const install = async () => {
+    setBusy(true)
+    setError(null)
+    try {
+      await fsGateway.installCli()
+      setInstalled(true)
+    } catch (e) {
+      setError(String(e))
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  return (
+    <section className="flex flex-col gap-3 border-t border-border/40 pt-4">
+      <div className="flex items-center gap-2">
+        <Terminal className="h-4 w-4 text-muted-foreground" />
+        <h3 className="text-sm font-medium">CLI</h3>
+      </div>
+      <p className="text-xs text-muted-foreground">
+        Instalá el comando <code className="font-mono text-foreground">kenafold</code> en{" "}
+        <code className="font-mono">~/.local/bin</code> para abrir el explorador desde la terminal.
+      </p>
+      {error && <p className="text-xs text-destructive">{error}</p>}
+      <Button
+        variant="outline"
+        size="sm"
+        className="w-fit"
+        onClick={install}
+        disabled={busy || installed === true}
+      >
+        {installed === true ? (
+          <>
+            <Check className="mr-1.5 h-3.5 w-3.5 text-green-500" />
+            Instalado
+          </>
+        ) : busy ? (
+          "Instalando…"
+        ) : (
+          "Instalar CLI"
+        )}
+      </Button>
+    </section>
   )
 }
