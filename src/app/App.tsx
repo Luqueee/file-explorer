@@ -23,6 +23,7 @@ import {
 import { ArchiveProgressPanel } from "@/features/file-explorer/components/archive-progress-panel"
 import { useClipboard } from "@/features/filesystem/api/use-clipboard"
 import { logger } from "@/shared/lib/logger"
+import { TagsProvider } from "@/features/tags/api/tags-context"
 
 const sidebarStyle = {
   "--sidebar-width": "calc(var(--spacing) * 56)",
@@ -150,11 +151,23 @@ export default function App() {
 
   const sidebarFocusPath = activePath ?? homeDir ?? "/"
 
+  const [tagFilter, setTagFilter] = useState<string | null>(null)
+
+  const handleTagFilter = useCallback((tagId: string | null) => {
+    setTagFilter((prev) => (prev === tagId ? null : tagId))
+  }, [])
+
+  useEffect(() => {
+    /* eslint-disable react-hooks/set-state-in-effect */
+    setTagFilter(null)
+    /* eslint-enable react-hooks/set-state-in-effect */
+  }, [activePath])
+
   const [headerEl, setHeaderEl] = useState<HTMLDivElement | null>(null)
   const [filterEl, setFilterEl] = useState<HTMLDivElement | null>(null)
 
   return (
-    <>
+    <TagsProvider>
       {homeDir ? (
         <SidebarProvider
           className="flex h-svh w-full flex-col overflow-hidden bg-background"
@@ -171,6 +184,8 @@ export default function App() {
               favorites={favorites}
               onNavigate={navigateActive}
               onRemoveFavorite={remove}
+              tagFilter={tagFilter}
+              onTagFilter={handleTagFilter}
             />
             <SidebarInset className="flex min-w-0 flex-1 flex-row overflow-hidden">
               {panes.map((p) => (
@@ -223,6 +238,6 @@ export default function App() {
 
       <ArchiveProgressPanel />
       <Toaster position="bottom-right" richColors closeButton />
-    </>
+    </TagsProvider>
   )
 }

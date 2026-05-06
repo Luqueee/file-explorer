@@ -6,10 +6,10 @@ Legend: 🔴 bug/debt · 🟣 feature · 🔄 refactor · ⚡ UX · 🧪 testing
 
 ## 🔴 Bugs / Deuda técnica
 
-- [ ] **Tests de selección incompletos** — modificación pendiente en `use-selection.ts` sin coverage actualizado. Verificar tests en `use-selection.test.ts`.
-- [ ] **Cancelación robusta de archive ops** — verificar leak de handles si user cancela mid-extract en `src-tauri/src/smb.rs`.
-- [ ] **Race condition watcher** — auditar `watcher.rs` cuando dir cambia durante listado paginado.
-- [ ] **Memory leak preview grande** — quick look video/PDF sin unmount cleanup.
+- [x] **Tests de selección incompletos** — 8 tests nuevos: `add`, `remove`, `replace` con path válido, `selectAll([])`, `range` con anchor fuera de lista, idempotencia.
+- [x] **Cancelación robusta de archive ops** — `spawn_blocking` usaba `map_err(...)?` que saltaba `unregister` en JoinError; cambiado a `unwrap_or_else` para garantizar cleanup de `CancelMap` y archivos parciales.
+- [x] **Race condition watcher** — `ActiveWatcher` ahora tiene `Arc<AtomicBool>` cancellation flag; se activa antes de dropar el watcher viejo. Además watcher estaba totalmente desconectado del frontend: agregado `useDirWatcher` hook + integrado en `FileExplorerProvider`.
+- [x] **Memory leak preview grande** — video: `pause()`+`src=""`+`load()` en unmount; PDF iframe: `src="about:blank"` en unmount; timer de volumen en VideoPlayer: `volTimer` ref cancela el `setTimeout`.
 
 ---
 

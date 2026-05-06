@@ -13,6 +13,7 @@ mod preview;
 mod search;
 mod smb;
 mod system;
+mod tags;
 mod terminal;
 
 fn external_navigation_plugin<R: tauri::Runtime>() -> tauri::plugin::TauriPlugin<R> {
@@ -92,6 +93,16 @@ pub fn run() {
             });
             app.manage(smb_state);
 
+            let tags_db_path = app
+                .path()
+                .app_data_dir()
+                .map(|d| d.join("tags.db"))
+                .unwrap_or_else(|_| std::path::PathBuf::from("tags.db"));
+            match tags::TagsDb::open(&tags_db_path) {
+                Ok(db) => { app.manage(db); }
+                Err(e) => log::error!("Failed to open tags DB: {}", e),
+            }
+
             #[cfg(target_os = "macos")]
             {
                 use objc2_app_kit::{NSColor, NSWindow};
@@ -146,7 +157,12 @@ pub fn run() {
             smb::smb_delete,
             smb::smb_mount,
             smb::smb_unmount,
-            smb::smb_is_mounted
+            smb::smb_is_mounted,
+            tags::tags_get,
+            tags::tags_set,
+            tags::tags_remove,
+            tags::tags_get_all,
+            tags::tags_get_by_tag
         ])
         .on_page_load(|webview, payload| {
             if webview.label() == "main" && matches!(payload.event(), PageLoadEvent::Finished) {

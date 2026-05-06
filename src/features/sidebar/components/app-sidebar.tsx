@@ -6,6 +6,7 @@ import {
   Download,
   HardDrive,
   Star,
+  Tag,
   X,
 } from "lucide-react"
 import {
@@ -14,11 +15,12 @@ import {
   SidebarGroup,
   SidebarGroupLabel,
   SidebarMenu,
-  SidebarMenuAction,
   SidebarMenuButton,
+  SidebarMenuAction,
   SidebarMenuItem,
 } from "@/components/ui/sidebar"
 import { SmbSection } from "@/features/smb/components/smb-section"
+import { useTags } from "@/features/tags/api/tags-context"
 
 interface Props extends React.ComponentProps<typeof Sidebar> {
   homeDir: string | null
@@ -26,6 +28,8 @@ interface Props extends React.ComponentProps<typeof Sidebar> {
   favorites: string[]
   onNavigate: (path: string) => void
   onRemoveFavorite: (path: string) => void
+  tagFilter: string | null
+  onTagFilter: (tagId: string | null) => void
 }
 
 export function AppSidebar({
@@ -34,8 +38,12 @@ export function AppSidebar({
   favorites,
   onNavigate,
   onRemoveFavorite,
+  tagFilter,
+  onTagFilter,
   ...props
 }: Props) {
+  const { getUsedTags } = useTags()
+  const usedTags = getUsedTags()
   const defaultBookmarks = React.useMemo(() => {
     if (!homeDir) return []
     return [
@@ -91,6 +99,33 @@ export function AppSidebar({
         </SidebarGroup>
 
         <SmbSection currentPath={currentPath} onNavigate={onNavigate} />
+
+        {usedTags.length > 0 && (
+          <SidebarGroup>
+            <SidebarGroupLabel>Etiquetas</SidebarGroupLabel>
+            <SidebarMenu>
+              {usedTags.map((tag) => (
+                <SidebarMenuItem key={tag.id}>
+                  <SidebarMenuButton
+                    isActive={tagFilter === tag.id}
+                    onClick={() => onTagFilter(tag.id)}
+                  >
+                    <Tag className="h-4 w-4 shrink-0" style={{ color: tag.color }} />
+                    <span className="flex-1 truncate">{tag.name}</span>
+                    {tagFilter === tag.id && (
+                      <SidebarMenuAction
+                        onClick={(e) => { e.stopPropagation(); onTagFilter(null) }}
+                        title="Quitar filtro"
+                      >
+                        <X className="h-3 w-3" />
+                      </SidebarMenuAction>
+                    )}
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+              ))}
+            </SidebarMenu>
+          </SidebarGroup>
+        )}
 
         <SidebarGroup>
           <SidebarGroupLabel>Dispositivos</SidebarGroupLabel>

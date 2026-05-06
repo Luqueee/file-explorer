@@ -37,6 +37,7 @@ trash = "5"
 grep = "0.3"
 notify = "8"
 notify-debouncer-mini = "0.7"
+rusqlite = { version = "0.32", features = ["bundled"] }
 
 [target."cfg(target_os = \"macos\")".dependencies]
 objc2 = "0.6"
