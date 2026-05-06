@@ -145,7 +145,7 @@ function CliSection() {
         <h3 className="text-sm font-medium">CLI</h3>
       </div>
       <p className="text-xs text-muted-foreground">
-        Instalá el comando <code className="font-mono text-foreground">kenafold</code> en{" "}
+        Instala el comando <code className="font-mono text-foreground">kenafold</code> en{" "}
         <code className="font-mono">~/.local/bin</code> para abrir el explorador desde la terminal.
       </p>
       {error && <p className="text-xs text-destructive">{error}</p>}

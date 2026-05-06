@@ -401,7 +401,7 @@ export function FileExplorerProvider({
         if (outcome === "fallback_clipboard") {
           toast.info("Comando copiado al portapapeles", {
             description:
-              "Tu terminal no soporta ejecución directa. Pegá y presioná Enter.",
+              "Tu terminal no soporta ejecución directa. Pega el comando y presiona Enter.",
           })
         }
       } catch (e) {

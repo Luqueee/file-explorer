@@ -270,7 +270,7 @@ export function FolderComparatorPanel({ onClose }: Props) {
         <div className="flex-1 overflow-y-auto">
           {!entries && !loading && !error && (
             <div className="flex h-full items-center justify-center text-sm text-muted-foreground">
-              Ingresá dos rutas y presioná Comparar
+              Ingresa dos rutas y presiona Comparar
             </div>
           )}
           {error && (

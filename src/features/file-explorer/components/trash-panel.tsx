@@ -154,8 +154,8 @@ export function TrashPanel({ onClose, restorePath, onRestored }: Props) {
                     Se necesita Acceso Total al Disco
                   </p>
                   <p className="mt-1 text-xs text-muted-foreground">
-                    macOS protege la Papelera. Otorgá permiso en Preferencias
-                    del Sistema, luego <strong>reiniciá Kenafold</strong>.
+                    macOS protege la Papelera. Otorga permiso en Preferencias
+                    del Sistema, luego <strong>reinicia Kenafold</strong>.
                   </p>
                 </div>
                 <div className="flex gap-2">

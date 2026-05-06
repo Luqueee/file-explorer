@@ -12,7 +12,7 @@ export function PreviewPane() {
     return (
       <div className="flex h-full w-full flex-col items-center justify-center gap-2 overflow-hidden p-4 text-center text-muted-foreground">
         <FileQuestion className="h-10 w-10 shrink-0" />
-        <p className="w-full text-sm">Seleccioná un archivo para previsualizar</p>
+        <p className="w-full text-sm">Selecciona un archivo para previsualizar</p>
       </div>
     )
   }
