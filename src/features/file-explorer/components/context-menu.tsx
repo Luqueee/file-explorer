@@ -402,15 +402,18 @@ function ContextMenuBody({
                 const rect = (
                   e.currentTarget as HTMLButtonElement
                 ).getBoundingClientRect()
-                const SUBMENU_W = 296
-                const spaceRight = window.innerWidth - (pos.x + 220)
+                const SUBMENU_W = 380
+                const SUBMENU_H = 230
+                const spaceRight = window.innerWidth - rect.right
                 const x =
                   spaceRight >= SUBMENU_W
-                    ? pos.x + 220
-                    : rect.left - SUBMENU_W - 80
-                setCompressMenuPos(
-                  compressMenuPos ? null : { x, y: rect.top - 52 }
-                )
+                    ? rect.right + 5
+                    : rect.left - SUBMENU_W
+                const y =
+                  rect.top + SUBMENU_H > window.innerHeight - 8
+                    ? Math.max(8, window.innerHeight - 8 - SUBMENU_H)
+                    : rect.top
+                setCompressMenuPos(compressMenuPos ? null : { x, y: y - 52 })
               }}
               className="flex w-full items-center gap-2.5 px-3 py-1.5 text-left text-sm hover:bg-accent"
             >
@@ -431,11 +434,32 @@ function ContextMenuBody({
               />
             )}
             <MenuDivider />
-            <MenuItem
-              icon={<Tag className="h-3.5 w-3.5" />}
-              label="Etiquetar"
-              onClick={() => setTagPickerPos({ x: pos.x + 208, y: pos.y })}
-            />
+            <button
+              role="menuitem"
+              onClick={(e) => {
+                const rect = (
+                  e.currentTarget as HTMLButtonElement
+                ).getBoundingClientRect()
+                const TAG_PICKER_W = 130
+                const TAG_PICKER_H = 290
+                const spaceRight = window.innerWidth - rect.right
+                const x =
+                  spaceRight >= TAG_PICKER_W
+                    ? rect.right + 5
+                    : rect.left - TAG_PICKER_W - 5
+                const y =
+                  rect.top + TAG_PICKER_H > window.innerHeight - 8
+                    ? Math.max(8, window.innerHeight - 8 - TAG_PICKER_H)
+                    : rect.top
+                setTagPickerPos({ x, y: y - 132 })
+              }}
+              className="flex w-full items-center gap-2.5 px-3 py-1.5 text-left text-sm hover:bg-accent"
+            >
+              <span className="flex h-4 w-4 items-center justify-center text-muted-foreground">
+                <Tag className="h-3.5 w-3.5" />
+              </span>
+              <span className="flex-1">Etiquetar</span>
+            </button>
             <MenuDivider />
             <MenuItem
               icon={<Trash2 className="h-3.5 w-3.5" />}

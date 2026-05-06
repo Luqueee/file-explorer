@@ -364,7 +364,10 @@ fn run_compression_zst(
     let writer = BufWriter::with_capacity(1 << 20, file);
     let mut encoder =
         zstd::stream::Encoder::new(writer, level.zstd()).map_err(|e| e.to_string())?;
-    encoder.multithread(workers()).map_err(|e| e.to_string())?;
+    // Level 19 MT divides data into independent jobs — cross-job context is lost,
+    // degrading effective compression. Single-thread is required for true level 19.
+    let zstd_workers = if level == CompressLevel::Best { 0 } else { workers() };
+    encoder.multithread(zstd_workers).map_err(|e| e.to_string())?;
     encoder.include_checksum(true).map_err(|e| e.to_string())?;
 
     if single_file {
@@ -902,6 +905,9 @@ pub async fn compress_entries(
                 total_bytes,
             },
         );
+        if cancelled {
+            return Ok(String::new());
+        }
         return Err(e.clone());
     }
 
@@ -1058,6 +1064,9 @@ pub async fn decompress_entry(
                 total_bytes: file_size,
             },
         );
+        if cancelled {
+            return Ok(String::new());
+        }
         return Err(e.clone());
     }
 
