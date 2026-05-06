@@ -456,8 +456,10 @@ pub async fn compress_entries(
         )
     })
     .await
-    .map_err(|e| format!("Tarea cancelada: {}", e))?;
+    // Flatten JoinError into our error type so unregister always runs below.
+    .unwrap_or_else(|e| Err(format!("Tarea cancelada: {}", e)));
 
+    // Always unregister — even on JoinError — to avoid leaking CancelMap entries.
     cancel_map.unregister(&op_id);
 
     if let Err(ref e) = result {
@@ -596,8 +598,10 @@ pub async fn decompress_entry(
         )
     })
     .await
-    .map_err(|e| format!("Tarea cancelada: {}", e))?;
+    // Flatten JoinError into our error type so unregister always runs below.
+    .unwrap_or_else(|e| Err(format!("Tarea cancelada: {}", e)));
 
+    // Always unregister — even on JoinError — to avoid leaking CancelMap entries.
     cancel_map.unregister(&op_id);
 
     if let Err(ref e) = result {

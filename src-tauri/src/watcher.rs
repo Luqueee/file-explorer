@@ -1,5 +1,6 @@
 use std::path::{Path, PathBuf};
-use std::sync::Mutex;
+use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
 use notify::RecursiveMode;
@@ -14,6 +15,8 @@ pub struct WatcherState {
 
 struct ActiveWatcher {
     path: PathBuf,
+    // Set to true before replacing so stale debounce callbacks are silenced.
+    cancelled: Arc<AtomicBool>,
     // Held for its lifetime — drop stops the watcher.
     _debouncer: Debouncer<notify::RecommendedWatcher>,
 }
@@ -39,14 +42,18 @@ pub fn watch_directory(
     }
     let target = p.to_path_buf();
 
-    // Replace any previous watcher — only one active at a time (the current dir).
-    let mut guard = state.inner.lock().map_err(|e| e.to_string())?;
-    *guard = None;
-
+    // Build the debouncer outside the lock — OS calls shouldn't block other callers.
+    let cancelled = Arc::new(AtomicBool::new(false));
+    let cancelled_cb = Arc::clone(&cancelled);
     let path_for_event = target.to_string_lossy().to_string();
+
     let mut debouncer = new_debouncer(
         Duration::from_millis(200),
         move |res: DebounceEventResult| {
+            // Guard against stale callbacks that fire after the watcher was replaced.
+            if cancelled_cb.load(Ordering::Relaxed) {
+                return;
+            }
             if res.is_ok() {
                 let _ = app.emit("dir:changed", &path_for_event);
             }
@@ -59,8 +66,15 @@ pub fn watch_directory(
         .watch(&target, RecursiveMode::NonRecursive)
         .map_err(|e| e.to_string())?;
 
+    let mut guard = state.inner.lock().map_err(|e| e.to_string())?;
+    // Cancel the previous watcher's callback before dropping it so any
+    // already-queued debounce timer can't emit for the old directory.
+    if let Some(old) = guard.as_ref() {
+        old.cancelled.store(true, Ordering::SeqCst);
+    }
     *guard = Some(ActiveWatcher {
         path: target,
+        cancelled,
         _debouncer: debouncer,
     });
     Ok(())
@@ -69,6 +83,9 @@ pub fn watch_directory(
 #[tauri::command]
 pub fn unwatch_directory(state: tauri::State<WatcherState>) -> Result<(), String> {
     let mut guard = state.inner.lock().map_err(|e| e.to_string())?;
+    if let Some(old) = guard.as_ref() {
+        old.cancelled.store(true, Ordering::SeqCst);
+    }
     *guard = None;
     Ok(())
 }

@@ -115,4 +115,6 @@ export const fsGateway = {
   smbMount: (id: string) => invoke<string>("smb_mount", { id }),
   smbUnmount: (id: string) => invoke<void>("smb_unmount", { id }),
   smbIsMounted: (id: string) => invoke<boolean>("smb_is_mounted", { id }),
+  watchDirectory: (path: string) => invoke<void>("watch_directory", { path }),
+  unwatchDirectory: () => invoke<void>("unwatch_directory"),
 }

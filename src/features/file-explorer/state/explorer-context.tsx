@@ -16,6 +16,7 @@ import type { HotkeyActionId } from "@/features/hotkeys/registry"
 import { DndContext, DragOverlay } from "@dnd-kit/core"
 import { toast } from "sonner"
 import { useDirectory } from "@/features/filesystem/api/use-directory"
+import { useDirWatcher } from "@/features/filesystem/api/use-dir-watcher"
 import { fsGateway, type SortBy, type SortDir } from "@/features/filesystem/infra/fs.gateway"
 import { fsErrorMessage } from "@/features/filesystem/domain/fs-error"
 import { useFileOps } from "@/features/filesystem/api/use-file-ops"
@@ -195,6 +196,8 @@ export function FileExplorerProvider({
     clipboardApi ?? localClipboard
   const undoStack = useUndoStack()
   const ops = useFileOps(reload, undoStack, setEntriesFromPage)
+
+  useDirWatcher(path, reload)
 
   const selection = useSelection()
   const selected = selection.anchorPath

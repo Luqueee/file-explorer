@@ -86,4 +86,62 @@ describe("useSelection", () => {
     act(() => result.current.replace(null))
     expect(result.current.selectedPaths.size).toBe(0)
   })
+
+  it("replace con path válido selecciona uno y setea anchor", () => {
+    const { result } = renderHook(() => useSelection())
+    act(() => result.current.replace("c"))
+    expect(Array.from(result.current.selectedPaths)).toEqual(["c"])
+    expect(result.current.anchorPath).toBe("c")
+  })
+
+  it("add agrega sin quitar selección previa", () => {
+    const { result } = renderHook(() => useSelection())
+    act(() => result.current.select("a", "replace", entries))
+    act(() => result.current.add("c"))
+    expect(result.current.selectedPaths.size).toBe(2)
+    expect(result.current.isSelected("a")).toBe(true)
+    expect(result.current.isSelected("c")).toBe(true)
+    expect(result.current.anchorPath).toBe("c")
+  })
+
+  it("add idempotente si path ya está", () => {
+    const { result } = renderHook(() => useSelection())
+    act(() => result.current.select("b", "replace", entries))
+    act(() => result.current.add("b"))
+    expect(result.current.selectedPaths.size).toBe(1)
+  })
+
+  it("remove quita path sin afectar el resto", () => {
+    const { result } = renderHook(() => useSelection())
+    act(() => result.current.selectAll(["a", "b", "c"]))
+    act(() => result.current.remove("b"))
+    expect(result.current.selectedPaths.size).toBe(2)
+    expect(result.current.isSelected("b")).toBe(false)
+    expect(result.current.isSelected("a")).toBe(true)
+    expect(result.current.isSelected("c")).toBe(true)
+  })
+
+  it("remove en path inexistente no rompe", () => {
+    const { result } = renderHook(() => useSelection())
+    act(() => result.current.select("a", "replace", entries))
+    act(() => result.current.remove("z"))
+    expect(result.current.selectedPaths.size).toBe(1)
+  })
+
+  it("selectAll vacío limpia selección y anchor", () => {
+    const { result } = renderHook(() => useSelection())
+    act(() => result.current.selectAll(["a", "b"]))
+    act(() => result.current.selectAll([]))
+    expect(result.current.selectedPaths.size).toBe(0)
+    expect(result.current.anchorPath).toBe(null)
+  })
+
+  it("range con anchor fuera de lista hace replace", () => {
+    const { result } = renderHook(() => useSelection())
+    // anchor fuera de la lista ordenada → fallback a replace
+    act(() => result.current.replace("z"))
+    act(() => result.current.select("b", "range", entries))
+    expect(Array.from(result.current.selectedPaths)).toEqual(["b"])
+    expect(result.current.anchorPath).toBe("b")
+  })
 })
