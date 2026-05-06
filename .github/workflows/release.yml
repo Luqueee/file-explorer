@@ -10,17 +10,7 @@ jobs:
   publish-tauri:
     permissions:
       contents: write
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - name: "macOS Apple Silicon"
-            platform: "macos-latest"
-            args: "--target aarch64-apple-darwin"
-          - name: "macOS Intel"
-            platform: "macos-latest"
-            args: "--target x86_64-apple-darwin"
-    runs-on: ${{ matrix.platform }}
+    runs-on: macos-latest
 
     steps:
       - name: Checkout repository
@@ -47,25 +37,29 @@ jobs:
         uses: tauri-apps/tauri-action@action-v0.6.2
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
+          APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+          APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
         with:
           tagName: v__VERSION__
-          releaseName: v__VERSION__
-          releaseBody: See the assets to download this version.
+          releaseName: Kenafold v__VERSION__
+          releaseBody: See the assets to download this version and install it on your machine.
           releaseDraft: true
           prerelease: false
           generateReleaseNotes: true
           retryAttempts: 2
-          args: ${{ matrix.args }}
-          assetNamePattern: "[name]-[version]-[platform]-[arch][ext]"
+          args: --target universal-apple-darwin
           includeUpdaterJson: false
 
       - name: Release summary
         if: steps.tauri.outputs.releaseHtmlUrl != ''
         run: |
           {
-            echo "## Tauri Release"
+            echo "## Kenafold Release"
             echo ""
-            echo "- Platform: \`${{ matrix.name }}\`"
             echo "- Version: \`${{ steps.tauri.outputs.appVersion }}\`"
             echo "- Release: ${{ steps.tauri.outputs.releaseHtmlUrl }}"
             echo "- Artifacts: \`${{ steps.tauri.outputs.artifactPaths }}\`"
