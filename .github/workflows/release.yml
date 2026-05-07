@@ -33,6 +33,9 @@ jobs:
         with:
           workspaces: apps/app/src-tauri
 
+      - name: Install create-dmg
+        run: brew install create-dmg
+
       - name: Install Bun
         uses: oven-sh/setup-bun@v2
         with:
@@ -47,6 +50,7 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           projectPath: apps/app
+          tauriScript: bun run tauri
           tagName: v__VERSION__
           releaseName: Kenafold v__VERSION__
           releaseBody: See the assets to download this version and install it on your machine.
