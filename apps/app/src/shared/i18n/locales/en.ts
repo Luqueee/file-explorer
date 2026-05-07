@@ -288,6 +288,15 @@ const en = {
     statusOnlyA: "Only A",
     statusOnlyB: "Only B",
   },
+  fileTable: {
+    colName: "Name",
+    colSize: "Size",
+    colModified: "Modified",
+    emptyDir: "Empty directory",
+    noResults: "No results for \"{{query}}\"",
+    newFolderPlaceholder: "New folder",
+    newFilePlaceholder: "name.extension",
+  },
   pane: {
     closeTab: "Close tab",
     newTab: "New tab",

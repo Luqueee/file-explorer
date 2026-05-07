@@ -288,6 +288,15 @@ const es = {
     statusOnlyA: "Solo A",
     statusOnlyB: "Solo B",
   },
+  fileTable: {
+    colName: "Nombre",
+    colSize: "Tamaño",
+    colModified: "Modificado",
+    emptyDir: "Directorio vacío",
+    noResults: "Sin resultados para \"{{query}}\"",
+    newFolderPlaceholder: "Nueva carpeta",
+    newFilePlaceholder: "nombre.extensión",
+  },
   pane: {
     closeTab: "Cerrar pestaña",
     newTab: "Nueva pestaña",

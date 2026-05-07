@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react"
+import { useTranslation } from "react-i18next"
 import { AlertCircle, ArrowDown, ArrowUp, ArrowUpDown, FileText, Folder, FolderOpen, Loader2, Search } from "lucide-react"
 import type { SortBy } from "@/features/filesystem/infra/fs.gateway"
 import { useVirtualizer } from "@tanstack/react-virtual"
@@ -17,6 +18,7 @@ const ROW_HEIGHT = 36
 
 export function FileTable() {
   "use no memo"
+  const { t } = useTranslation()
   const {
     entries,
     filteredEntries,
@@ -57,7 +59,7 @@ export function FileTable() {
           </div>
           <p className="max-w-md text-sm text-destructive">{error}</p>
           <Button variant="outline" size="sm" onClick={reload}>
-            Reintentar
+            {t("common.retry")}
           </Button>
         </div>
       )}
@@ -69,7 +71,7 @@ export function FileTable() {
         inlineMode !== "newFile" && (
           <div className="flex h-full flex-col items-center justify-center gap-2 text-muted-foreground">
             <FolderOpen className="h-8 w-8 opacity-50" />
-            <p className="text-sm">Directorio vacío</p>
+            <p className="text-sm">{t("fileTable.emptyDir")}</p>
           </div>
         )}
 
@@ -79,7 +81,7 @@ export function FileTable() {
         filteredEntries.length === 0 && (
           <div className="flex h-full flex-col items-center justify-center gap-2 text-muted-foreground">
             <Search className="h-8 w-8 opacity-50" />
-            <p className="text-sm">Sin resultados para "{filterQuery}"</p>
+            <p className="text-sm">{t("fileTable.noResults", { query: filterQuery })}</p>
           </div>
         )}
 
@@ -124,6 +126,7 @@ function SortHeader({
 }
 
 function VirtualTable() {
+  const { t } = useTranslation()
   const { getTagsForPath } = useTags()
   const {
     filteredEntries,
@@ -208,7 +211,7 @@ function VirtualTable() {
           <th className="px-4 py-2 text-left">
             <SortHeader
               column="name"
-              label="Nombre"
+              label={t("fileTable.colName")}
               align="left"
               sortBy={sortBy}
               sortDir={sortDir}
@@ -218,7 +221,7 @@ function VirtualTable() {
           <th className="w-28 px-4 py-2 text-right">
             <SortHeader
               column="size"
-              label="Tamaño"
+              label={t("fileTable.colSize")}
               align="right"
               sortBy={sortBy}
               sortDir={sortDir}
@@ -228,7 +231,7 @@ function VirtualTable() {
           <th className="w-36 px-4 py-2 text-right">
             <SortHeader
               column="modified"
-              label="Modificado"
+              label={t("fileTable.colModified")}
               align="right"
               sortBy={sortBy}
               sortDir={sortDir}
@@ -248,7 +251,7 @@ function VirtualTable() {
                 onChange={setInlineValue}
                 onCommit={commitInline}
                 onCancel={cancelInline}
-                placeholder="Nueva carpeta"
+                placeholder={t("fileTable.newFolderPlaceholder")}
               />
             </td>
             <td />
@@ -266,7 +269,7 @@ function VirtualTable() {
                 onChange={setInlineValue}
                 onCommit={commitInline}
                 onCancel={cancelInline}
-                placeholder="nombre.extensión"
+                placeholder={t("fileTable.newFilePlaceholder")}
               />
             </td>
             <td />
