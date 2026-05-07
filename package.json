@@ -9,6 +9,8 @@
   ],
   "scripts": {
     "dev": "turbo dev",
+    "dev:web": "turbo dev --filter @kenafold/web",
+    "dev:app": "turbo dev --filter @kenafold/app",
     "build": "turbo build",
     "build:ui": "turbo build --filter @kenafold/ui",
     "build:web": "turbo build --filter @kenafold/web",
@@ -17,10 +19,6 @@
     "lint": "turbo lint",
     "test": "turbo test",
     "format": "prettier --write \"**/*.{ts,tsx}\""
-  },
-  "overrides": {
-    "@tanstack/router-generator": "1.120.20",
-    "@tanstack/router-plugin": "1.120.20"
   },
   "devDependencies": {
     "prettier": "^3.8.1",
