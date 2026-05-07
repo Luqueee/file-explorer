@@ -4,6 +4,7 @@ import { addCollection } from "@iconify/react"
 import type { IconifyJSON } from "@iconify/types"
 
 import "./index.css"
+import "@/shared/i18n/i18n"
 import App from "./app/App"
 import { AppProviders } from "./app/providers"
 

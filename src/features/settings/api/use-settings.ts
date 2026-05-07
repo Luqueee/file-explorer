@@ -1,6 +1,13 @@
 import { useCallback, useEffect, useState } from "react"
 import { fsGateway } from "@/features/filesystem/infra/fs.gateway"
 import { logger } from "@/shared/lib/logger"
+import i18n, {
+  type Language,
+  readStoredLanguage,
+  writeStoredLanguage,
+} from "@/shared/i18n/i18n"
+
+export type { Language }
 
 export interface TerminalInfo {
   id: string
@@ -18,6 +25,7 @@ export function useSettings() {
   const [terminalId, setTerminalIdState] = useState<string | null>(readTerminal)
   const [terminals, setTerminals] = useState<TerminalInfo[]>([])
   const [loadingTerminals, setLoadingTerminals] = useState(false)
+  const [language, setLanguageState] = useState<Language | null>(readStoredLanguage)
 
   const refreshTerminals = useCallback(async () => {
     setLoadingTerminals(true)
@@ -44,11 +52,19 @@ export function useSettings() {
     else window.localStorage.removeItem(TERMINAL_KEY)
   }, [])
 
+  const setLanguage = useCallback((lang: Language) => {
+    setLanguageState(lang)
+    writeStoredLanguage(lang)
+    i18n.changeLanguage(lang)
+  }, [])
+
   return {
     terminalId,
     setTerminalId,
     terminals,
     loadingTerminals,
     refreshTerminals,
+    language,
+    setLanguage,
   }
 }
