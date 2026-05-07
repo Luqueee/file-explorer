@@ -39,12 +39,6 @@ kenafold ~/Projects   # open at a specific path
 sudo ln -sf "/Applications/Kenafold.app/Contents/Resources/scripts/kenafold" /usr/local/bin/kenafold
 ```
 
-Or, if you cloned the repo:
-
-```bash
-sudo ln -sf "$PWD/scripts/kenafold" /usr/local/bin/kenafold
-```
-
 ---
 
 ## Features
@@ -52,18 +46,16 @@ sudo ln -sf "$PWD/scripts/kenafold" /usr/local/bin/kenafold
 - **Dual-pane layout** with multi-tab navigation per pane
 - **List & grid view** with virtualised rendering for large directories
 - **Inline quick filter** — type to filter without leaving the keyboard
-- **Preview pane** — images, video, PDF, code with syntax highlight (shiki), archives
+- **Preview pane** — images, video, PDF, code with syntax highlight, archives
 - **Full keyboard control** — configurable hotkeys for every action
 - **File operations** — copy, move, rename, delete (to Trash), with undo
-- **Bulk rename** — regex/pattern tokens (`{n}`, `{ext}`, `{date}`) with live preview
+- **Bulk rename** — regex/pattern tokens with live preview
 - **Tags** — color-coded labels stored in SQLite, filterable from the sidebar
 - **Archive support** — compress/decompress zip, tar.zst, tar.gz, tar.bz2 with progress
 - **Folder comparator** — diff two directories by size, mtime, and SHA-256 hash
-- **Disk usage panel** — treemap visualisation (à la Disk Inventory X)
-- **Git-aware badges** — modified / staged / untracked markers on files inside repos _(in progress)_
+- **Disk usage panel** — treemap visualisation
 - **SMB / network shares** — mount and browse shares from the sidebar
 - **Native macOS notifications** — on long copy / archive operations
-- **Onboarding tour** — first-run highlight of key features
 
 ---
 
@@ -73,42 +65,66 @@ sudo ln -sf "$PWD/scripts/kenafold" /usr/local/bin/kenafold
 | ----- | ------------------- |
 | macOS | 13 Ventura or later |
 | Rust  | stable (latest)     |
-| Node  | 20+                 |
 | Bun   | 1.x                 |
 
 ---
 
 ## Development
 
+This is a monorepo managed with [Bun workspaces](https://bun.sh/docs/install/workspaces) and [Turbo](https://turbo.build/).
+
+```
+apps/
+  app/    # Tauri 2 desktop app (React + Vite + Rust)
+  web/    # Landing page (TanStack Router + Vite)
+packages/
+  ui/     # Shared shadcn components + Tailwind 4 theme (@kenafold/ui)
+```
+
+### Setup
+
 ```bash
-# Install dependencies
 bun install
+```
 
-# Start the full Tauri dev app (Rust + frontend hot-reload)
-bun run tauri dev
+### Commands
 
-# Frontend only (port 1420)
+```bash
+# Desktop app (Tauri + Rust + frontend hot-reload)
+bun run dev:app
+
+# Landing page
+bun run dev:web
+
+# Both in parallel
 bun run dev
 
-# Type-check
+# Type-check all packages
 bun run typecheck
 
-# Lint
+# Lint all packages
 bun run lint
 
 # Tests
 bun run test
 ```
 
-> **Note:** never run `bun run build` directly — use `bun tauri build` for production.
+From `apps/app/` directly:
+
+```bash
+bun run dev           # tauri dev (full app)
+bun run dev:vite      # vite only (frontend, port 1420)
+bun run test          # vitest
+bun run test:e2e      # playwright
+```
 
 ---
 
 ## Project structure
 
 ```
-src/
-  features/
+apps/app/
+  src/features/
     file-explorer/   # main pane, selection, view modes, drag-drop
     filesystem/      # file ops, undo stack, directory listing
     hotkeys/         # global hotkey registry + user-configurable bindings
@@ -118,21 +134,20 @@ src/
     sidebar/         # favorites + SMB shares
     smb/             # SMB/network share mounting
     tags/            # color-coded tags (SQLite)
-  shared/
-    lib/             # cross-feature pure utilities
-    tauri/           # shared Tauri helpers
-  components/ui/     # shadcn primitives
+  src-tauri/src/
+    archive.rs       # compress / decompress
+    comparator.rs    # folder diff
+    fs.rs            # file operations + directory listing
+    grep.rs          # ripgrep integration
+    hash.rs          # SHA-256 / SHA-1 / MD5
+    preview.rs       # file preview
+    search.rs        # full-text search
+    tags.rs          # SQLite tag storage
+    watcher.rs       # FSEvents directory watcher
 
-src-tauri/src/
-  archive.rs         # compress / decompress (zip, tar.zst, tar.gz, tar.bz2)
-  comparator.rs      # folder diff
-  fs.rs              # file operations + directory listing
-  grep.rs            # ripgrep integration
-  hash.rs            # SHA-256 / SHA-1 / MD5
-  preview.rs         # file preview (text, image, PDF, video, archive listing)
-  search.rs          # full-text search
-  tags.rs            # SQLite tag storage
-  watcher.rs         # FSEvents directory watcher
+packages/ui/
+  src/components/    # shadcn primitives
+  globals.css        # Tailwind 4 theme tokens
 ```
 
 ---
@@ -142,14 +157,15 @@ src-tauri/src/
 | Layer                   | Tech                                                        |
 | ----------------------- | ----------------------------------------------------------- |
 | Frontend                | React 19, TypeScript, Vite 7, TailwindCSS 4                 |
-| UI components           | shadcn/ui (Radix UI), lucide-react, Iconify (VS Code icons) |
+| Shared UI               | `@kenafold/ui` — shadcn/ui (Radix UI), lucide-react         |
 | Tables / virtual scroll | TanStack Table + TanStack Virtual                           |
 | Hotkeys                 | TanStack Hotkeys                                            |
 | Drag & drop             | dnd-kit                                                     |
 | Syntax highlight        | shiki (lazy-loaded)                                         |
 | Charts                  | Recharts                                                    |
 | Backend                 | Rust, Tauri 2                                               |
-| Package manager         | Bun                                                         |
+| Package manager         | Bun workspaces                                              |
+| Monorepo                | Turbo 2                                                     |
 | Tests                   | Vitest + @testing-library/react                             |
 
 ---
