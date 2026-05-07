@@ -1,5 +1,6 @@
 import * as React from "react"
 import { useState, useCallback } from "react"
+import { useTranslation } from "react-i18next"
 import {
   Home,
   Monitor,
@@ -24,7 +25,6 @@ import {
   SidebarMenuAction,
   SidebarMenuItem,
 } from "@/components/ui/sidebar"
-// SidebarMenuButton/SidebarMenuAction used by tags and SMB sections below
 import { SmbSection } from "@/features/smb/components/smb-section"
 import { useTags } from "@/features/tags/api/tags-context"
 import { fsGateway } from "@/features/filesystem/infra/fs.gateway"
@@ -52,6 +52,7 @@ function FavoriteTreeNode({
   onNavigate,
   onRemove,
 }: TreeNodeProps) {
+  const { t } = useTranslation()
   const [open, setOpen] = useState(false)
   const [children, setChildren] = useState<FileEntry[] | null>(null)
   const [loading, setLoading] = useState(false)
@@ -93,7 +94,7 @@ function FavoriteTreeNode({
         <button
           className="flex h-4 w-4 shrink-0 items-center justify-center rounded hover:bg-black/10 dark:hover:bg-white/10"
           onClick={toggle}
-          title={open ? "Colapsar" : "Expandir"}
+          title={open ? t("sidebar.collapse") : t("sidebar.expand")}
         >
           {loading ? (
             <Loader2 className="h-3 w-3 animate-spin" />
@@ -116,7 +117,7 @@ function FavoriteTreeNode({
               e.stopPropagation()
               onRemove()
             }}
-            title="Quitar de favoritos"
+            title={t("sidebar.removeFavorite")}
           >
             <X className="h-3 w-3" />
           </button>
@@ -142,7 +143,7 @@ function FavoriteTreeNode({
           className="py-1 text-xs text-muted-foreground"
           style={{ paddingLeft: `${8 + (depth + 1) * 14 + 20}px` }}
         >
-          Sin subcarpetas
+          {t("sidebar.noSubfolders")}
         </div>
       )}
     </div>
@@ -177,23 +178,25 @@ export function AppSidebar({
   onRemoveSavedSearch,
   ...props
 }: Props) {
+  const { t } = useTranslation()
   const { getUsedTags } = useTags()
   const usedTags = getUsedTags()
+
   const defaultBookmarks = React.useMemo(() => {
     if (!homeDir) return []
     return [
-      { label: "Inicio", icon: Home, path: homeDir },
-      { label: "Escritorio", icon: Monitor, path: `${homeDir}/Desktop` },
-      { label: "Documentos", icon: FileText, path: `${homeDir}/Documents` },
-      { label: "Descargas", icon: Download, path: `${homeDir}/Downloads` },
+      { label: t("sidebar.home"), icon: Home, path: homeDir },
+      { label: t("sidebar.desktop"), icon: Monitor, path: `${homeDir}/Desktop` },
+      { label: t("sidebar.documents"), icon: FileText, path: `${homeDir}/Documents` },
+      { label: t("sidebar.downloads"), icon: Download, path: `${homeDir}/Downloads` },
     ]
-  }, [homeDir])
+  }, [homeDir, t])
 
   return (
     <Sidebar collapsible="offcanvas" className="p-0" {...props}>
       <SidebarContent>
         <SidebarGroup>
-          <SidebarGroupLabel>Favoritos</SidebarGroupLabel>
+          <SidebarGroupLabel>{t("sidebar.favorites")}</SidebarGroupLabel>
           <SidebarMenu>
             {defaultBookmarks.map((item) => (
               <SidebarMenuItem key={item.path}>
@@ -229,7 +232,7 @@ export function AppSidebar({
 
         {usedTags.length > 0 && (
           <SidebarGroup>
-            <SidebarGroupLabel>Etiquetas</SidebarGroupLabel>
+            <SidebarGroupLabel>{t("sidebar.tags")}</SidebarGroupLabel>
             <SidebarMenu>
               {usedTags.map((tag) => (
                 <SidebarMenuItem key={tag.id} className="group/tag">
@@ -243,7 +246,7 @@ export function AppSidebar({
                   {tagFilter === tag.id && (
                     <SidebarMenuAction
                       onClick={(e) => { e.stopPropagation(); onTagFilter(null) }}
-                      title="Quitar filtro"
+                      title={t("sidebar.removeFilter")}
                     >
                       <X className="h-3 w-3" />
                     </SidebarMenuAction>
@@ -256,7 +259,7 @@ export function AppSidebar({
 
         {savedSearches.length > 0 && (
           <SidebarGroup>
-            <SidebarGroupLabel>Búsquedas</SidebarGroupLabel>
+            <SidebarGroupLabel>{t("sidebar.searches")}</SidebarGroupLabel>
             <SidebarMenu>
               {savedSearches.map((s) => (
                 <SidebarMenuItem key={s.id} className="group/saved">
@@ -264,12 +267,12 @@ export function AppSidebar({
                     <Search className="h-3.5 w-3.5 shrink-0" />
                     <span className="flex-1 truncate">{s.query}</span>
                     <span className="shrink-0 text-[10px] text-muted-foreground">
-                      {s.mode === "name" ? "nombre" : "contenido"}
+                      {s.mode === "name" ? t("sidebar.nameMode") : t("sidebar.contentMode")}
                     </span>
                   </SidebarMenuButton>
                   <SidebarMenuAction
                     onClick={(e) => { e.stopPropagation(); onRemoveSavedSearch(s.id) }}
-                    title="Eliminar búsqueda guardada"
+                    title={t("sidebar.deleteSearch")}
                     className="hidden group-hover/saved:flex"
                   >
                     <X className="h-3 w-3" />
@@ -281,7 +284,7 @@ export function AppSidebar({
         )}
 
         <SidebarGroup>
-          <SidebarGroupLabel>Dispositivos</SidebarGroupLabel>
+          <SidebarGroupLabel>{t("sidebar.devices")}</SidebarGroupLabel>
           <SidebarMenu>
             <SidebarMenuItem>
               <SidebarMenuButton
@@ -289,13 +292,13 @@ export function AppSidebar({
                 onClick={() => onNavigate("/")}
               >
                 <HardDrive />
-                Raíz del sistema
+                {t("sidebar.systemRoot")}
               </SidebarMenuButton>
             </SidebarMenuItem>
             <SidebarMenuItem>
               <SidebarMenuButton onClick={onOpenTrash}>
                 <Trash2 />
-                Papelera
+                {t("sidebar.trash")}
               </SidebarMenuButton>
             </SidebarMenuItem>
           </SidebarMenu>

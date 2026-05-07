@@ -1,5 +1,6 @@
-import { RefreshCw, Terminal, Check } from "lucide-react"
+import { RefreshCw, Terminal, Check, Globe } from "lucide-react"
 import { useState, useEffect } from "react"
+import { useTranslation } from "react-i18next"
 import { fsGateway } from "@/features/filesystem/infra/fs.gateway"
 import { Button } from "@/components/ui/button"
 import {
@@ -11,6 +12,8 @@ import {
 } from "@/components/ui/sheet"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { HotkeysList } from "@/features/hotkeys/components/hotkeys-list"
+import { cn } from "@/lib/utils"
+import { SUPPORTED_LANGUAGES, type Language } from "@/shared/i18n/i18n"
 import type { TerminalInfo } from "../api/use-settings"
 
 interface Props {
@@ -21,6 +24,8 @@ interface Props {
   terminalId: string | null
   setTerminalId: (id: string | null) => void
   refreshTerminals: () => void
+  language: Language | null
+  setLanguage: (lang: Language) => void
 }
 
 export function SettingsPanel({
@@ -31,23 +36,25 @@ export function SettingsPanel({
   terminalId,
   setTerminalId,
   refreshTerminals,
+  language,
+  setLanguage,
 }: Props) {
+  const { t } = useTranslation()
   const effectiveId = terminalId ?? terminals[0]?.id ?? null
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetContent className="flex w-[28rem] flex-col gap-4 p-6 sm:max-w-lg">
         <SheetHeader className="p-0">
-          <SheetTitle>Configuración</SheetTitle>
-          <SheetDescription>
-            Personaliza las preferencias del explorador.
-          </SheetDescription>
+          <SheetTitle>{t("settings.title")}</SheetTitle>
+          <SheetDescription>{t("settings.description")}</SheetDescription>
         </SheetHeader>
 
         <Tabs defaultValue="terminal" className="flex min-h-0 flex-1 flex-col gap-3">
           <TabsList>
-            <TabsTrigger value="terminal">Terminal</TabsTrigger>
-            <TabsTrigger value="hotkeys">Atajos</TabsTrigger>
+            <TabsTrigger value="terminal">{t("settings.terminalTab")}</TabsTrigger>
+            <TabsTrigger value="hotkeys">{t("settings.shortcutsTab")}</TabsTrigger>
+            <TabsTrigger value="language">{t("settings.languageTab")}</TabsTrigger>
           </TabsList>
 
           <TabsContent value="terminal" className="m-0 min-h-0 overflow-auto">
@@ -55,7 +62,7 @@ export function SettingsPanel({
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
                   <Terminal className="h-4 w-4 text-muted-foreground" />
-                  <h3 className="text-sm font-medium">Terminal por defecto</h3>
+                  <h3 className="text-sm font-medium">{t("settings.defaultTerminal")}</h3>
                 </div>
                 <Button
                   variant="ghost"
@@ -63,7 +70,7 @@ export function SettingsPanel({
                   className="h-7 w-7"
                   onClick={refreshTerminals}
                   disabled={loadingTerminals}
-                  title="Re-detectar"
+                  title={t("settings.reDetect")}
                 >
                   <RefreshCw
                     className={`h-3.5 w-3.5 ${loadingTerminals ? "animate-spin" : ""}`}
@@ -73,26 +80,24 @@ export function SettingsPanel({
 
               {terminals.length === 0 ? (
                 <p className="text-xs text-muted-foreground">
-                  {loadingTerminals
-                    ? "Detectando terminales..."
-                    : "No se detectaron terminales instaladas."}
+                  {loadingTerminals ? t("settings.detecting") : t("settings.noTerminals")}
                 </p>
               ) : (
                 <ul className="flex flex-col gap-1">
-                  {terminals.map((t) => {
-                    const selected = effectiveId === t.id
+                  {terminals.map((t_) => {
+                    const selected = effectiveId === t_.id
                     return (
-                      <li key={t.id}>
+                      <li key={t_.id}>
                         <button
                           type="button"
-                          onClick={() => setTerminalId(t.id)}
+                          onClick={() => setTerminalId(t_.id)}
                           className={`flex w-full items-center justify-between rounded-md border px-3 py-2 text-sm transition-colors ${
                             selected
                               ? "border-primary/60 bg-primary/10"
                               : "border-border/40 hover:bg-muted/50"
                           }`}
                         >
-                          <span>{t.name}</span>
+                          <span>{t_.name}</span>
                           {selected && (
                             <span className="text-xs text-primary">✓</span>
                           )}
@@ -110,13 +115,59 @@ export function SettingsPanel({
           <TabsContent value="hotkeys" className="m-0 min-h-0 overflow-auto">
             <HotkeysList />
           </TabsContent>
+
+          <TabsContent value="language" className="m-0 min-h-0 overflow-auto">
+            <LanguageSection current={language} onSelect={setLanguage} />
+          </TabsContent>
         </Tabs>
       </SheetContent>
     </Sheet>
   )
 }
 
+function LanguageSection({
+  current,
+  onSelect,
+}: {
+  current: Language | null
+  onSelect: (lang: Language) => void
+}) {
+  const { t } = useTranslation()
+
+  return (
+    <section className="flex flex-col gap-3">
+      <div className="flex items-center gap-2">
+        <Globe className="h-4 w-4 text-muted-foreground" />
+        <h3 className="text-sm font-medium">{t("settings.languageLabel")}</h3>
+      </div>
+      <ul className="flex flex-col gap-1">
+        {SUPPORTED_LANGUAGES.map((lang) => {
+          const selected = (current ?? "en") === lang
+          return (
+            <li key={lang}>
+              <button
+                type="button"
+                onClick={() => onSelect(lang)}
+                className={cn(
+                  "flex w-full items-center justify-between rounded-md border px-3 py-2 text-sm transition-colors",
+                  selected
+                    ? "border-primary/60 bg-primary/10"
+                    : "border-border/40 hover:bg-muted/50"
+                )}
+              >
+                <span>{t(`languages.${lang}`)}</span>
+                {selected && <Check className="h-3.5 w-3.5 text-primary" />}
+              </button>
+            </li>
+          )
+        })}
+      </ul>
+    </section>
+  )
+}
+
 function CliSection() {
+  const { t } = useTranslation()
   const [installed, setInstalled] = useState<boolean | null>(null)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -142,11 +193,10 @@ function CliSection() {
     <section className="flex flex-col gap-3 border-t border-border/40 pt-4">
       <div className="flex items-center gap-2">
         <Terminal className="h-4 w-4 text-muted-foreground" />
-        <h3 className="text-sm font-medium">CLI</h3>
+        <h3 className="text-sm font-medium">{t("settings.cliTitle")}</h3>
       </div>
       <p className="text-xs text-muted-foreground">
-        Instala el comando <code className="font-mono text-foreground">kenafold</code> en{" "}
-        <code className="font-mono">~/.local/bin</code> para abrir el explorador desde la terminal.
+        {t("settings.cliDescription")}
       </p>
       {error && <p className="text-xs text-destructive">{error}</p>}
       <Button
@@ -159,12 +209,12 @@ function CliSection() {
         {installed === true ? (
           <>
             <Check className="mr-1.5 h-3.5 w-3.5 text-green-500" />
-            Instalado
+            {t("settings.cliInstalled")}
           </>
         ) : busy ? (
-          "Instalando…"
+          t("settings.cliInstalling")
         ) : (
-          "Instalar CLI"
+          t("settings.cliInstall")
         )}
       </Button>
     </section>

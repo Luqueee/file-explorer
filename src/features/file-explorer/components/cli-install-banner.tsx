@@ -1,5 +1,6 @@
 /* eslint-disable react-hooks/set-state-in-effect */
 import { useEffect, useState } from "react"
+import { useTranslation } from "react-i18next"
 import { Terminal, X, Check } from "lucide-react"
 import { fsGateway } from "@/features/filesystem/infra/fs.gateway"
 
@@ -8,6 +9,7 @@ const DISMISSED_KEY = "kenafold:cli-banner-dismissed"
 type State = "checking" | "hidden" | "visible" | "installing" | "done" | "error"
 
 export function CliInstallBanner() {
+  const { t } = useTranslation()
   const [state, setState] = useState<State>("checking")
   const [error, setError] = useState<string | null>(null)
 
@@ -47,24 +49,21 @@ export function CliInstallBanner() {
       {state === "done" ? (
         <span className="flex flex-1 items-center gap-1.5 text-green-600 dark:text-green-400">
           <Check className="h-3.5 w-3.5" />
-          CLI instalado — ya puedes usar{" "}
-          <code className="font-mono">kenafold .</code> en la terminal
+          {t("cliBanner.installed")}
         </span>
       ) : state === "error" ? (
         <span className="flex-1 text-destructive">{error}</span>
       ) : (
         <>
           <span className="flex-1 text-muted-foreground">
-            Instala el comando{" "}
-            <code className="font-mono text-foreground">kenafold</code> para
-            abrir el explorador desde la terminal
+            {t("cliBanner.installPrompt")}
           </span>
           <button
             onClick={install}
             disabled={state === "installing"}
             className="rounded px-2.5 py-1 text-xs font-medium ring-1 ring-border hover:bg-accent disabled:opacity-50"
           >
-            {state === "installing" ? "Instalando…" : "Instalar"}
+            {state === "installing" ? t("cliBanner.installing") : t("cliBanner.install")}
           </button>
         </>
       )}
@@ -72,7 +71,7 @@ export function CliInstallBanner() {
       <button
         onClick={dismiss}
         className="rounded p-1 text-muted-foreground hover:bg-muted"
-        aria-label="Cerrar"
+        aria-label={t("cliBanner.dismiss")}
       >
         <X className="h-3.5 w-3.5" />
       </button>

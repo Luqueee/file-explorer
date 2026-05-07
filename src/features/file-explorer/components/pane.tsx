@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react"
 import { createPortal } from "react-dom"
+import { useTranslation } from "react-i18next"
 import { Plus, X } from "lucide-react"
 import { useHistory } from "@/features/navigation/api/use-history"
 import type { useClipboard } from "@/features/filesystem/api/use-clipboard"
@@ -171,6 +172,7 @@ export function Pane({
   filterContainer,
   tagFilter,
 }: Props) {
+  const { t } = useTranslation()
   const [tabs, setTabs] = useState<TabEntry[]>(() => [
     { id: `${paneId}-t1`, initialPath },
   ])
@@ -270,7 +272,7 @@ export function Pane({
                   closeTab(tab.id)
                 }}
                 className="shrink-0 rounded p-0.5 opacity-0 group-hover:opacity-100 hover:bg-muted-foreground/20"
-                aria-label="Cerrar pestaña"
+                aria-label={t("pane.closeTab")}
               >
                 <X className="h-2.5 w-2.5" />
               </button>
@@ -281,7 +283,7 @@ export function Pane({
       <button
         onClick={addTab}
         className="ml-1 shrink-0 rounded p-1 text-muted-foreground hover:bg-muted hover:text-foreground"
-        aria-label="Nueva pestaña"
+        aria-label={t("pane.newTab")}
       >
         <Plus className="h-3 w-3" />
       </button>
@@ -292,7 +294,7 @@ export function Pane({
             onClose()
           }}
           className="ml-2 shrink-0 rounded p-1 text-muted-foreground hover:bg-muted"
-          aria-label="Cerrar panel"
+          aria-label={t("pane.closePane")}
         >
           <X className="h-3.5 w-3.5" />
         </button>

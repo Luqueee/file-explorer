@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react"
 import { useDroppable } from "@dnd-kit/core"
+import { useTranslation } from "react-i18next"
 import { useAction } from "@/features/hotkeys/bindings"
 import {
   ArrowLeft,
@@ -40,6 +41,7 @@ function DroppableUpButton({
   isDragging: boolean
   onNavigate: (path: string) => void
 }) {
+  const { t } = useTranslation()
   const { setNodeRef, isOver } = useDroppable({
     id: "nav-up",
     data: { navPath: parent },
@@ -53,7 +55,7 @@ function DroppableUpButton({
         size="icon"
         disabled={!parent}
         onClick={() => parent && onNavigate(parent)}
-        title="Subir directorio"
+        title={t("toolbar.goUp")}
         className={`h-8 w-8 transition-colors ${
           isOver
             ? "bg-primary/15 ring-2 ring-primary"
@@ -103,6 +105,7 @@ function DroppableBreadcrumbLink({
 }
 
 export function Toolbar() {
+  const { t } = useTranslation()
   const {
     segments,
     parent,
@@ -178,7 +181,7 @@ export function Toolbar() {
           className="h-8 w-8"
           onClick={onBack}
           disabled={!canBack}
-          title="Atrás (⌘[)"
+          title={t("toolbar.back")}
         >
           <ArrowLeft className="h-4 w-4" />
         </Button>
@@ -188,7 +191,7 @@ export function Toolbar() {
           className="h-8 w-8"
           onClick={onForward}
           disabled={!canForward}
-          title="Adelante (⌘])"
+          title={t("toolbar.forward")}
         >
           <ArrowRight className="h-4 w-4" />
         </Button>
@@ -203,7 +206,7 @@ export function Toolbar() {
           size="icon"
           className="h-8 w-8"
           onClick={reload}
-          title="Actualizar"
+          title={t("toolbar.refresh")}
           disabled={loading}
         >
           <RefreshCw className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} />
@@ -214,7 +217,7 @@ export function Toolbar() {
           className="h-8 w-8"
           onClick={() => onAddFavorite(path)}
           disabled={isFavorite}
-          title={isFavorite ? "Ya está en favoritos" : "Agregar a favoritos"}
+          title={isFavorite ? t("toolbar.alreadyFavorite") : t("toolbar.addFavorite")}
         >
           <Star
             className={`h-4 w-4 ${isFavorite ? "fill-amber-400 text-amber-400" : ""}`}
@@ -227,7 +230,7 @@ export function Toolbar() {
           size="icon"
           className="h-8 w-8"
           onClick={startPathEdit}
-          title="Copiar y editar ruta"
+          title={t("toolbar.copyEditPath")}
         >
           <Pencil className="h-4 w-4" />
         </Button>
@@ -236,7 +239,7 @@ export function Toolbar() {
           size="icon"
           className="h-8 w-8"
           onClick={openTerminal}
-          title="Abrir terminal aquí"
+          title={t("toolbar.openTerminal")}
         >
           <Terminal className="h-4 w-4" />
         </Button>
@@ -266,7 +269,7 @@ export function Toolbar() {
           <Breadcrumb
             className="min-w-0 flex-1 cursor-text overflow-hidden"
             onClick={startPathEdit}
-            title="Editar ruta"
+            title={t("toolbar.editPath")}
           >
             <BreadcrumbList className="flex-nowrap">
               {(segments.length > 6
@@ -322,9 +325,7 @@ export function Toolbar() {
           size="icon"
           className="h-8 w-8"
           onClick={() => setShowHidden(!showHidden)}
-          title={
-            showHidden ? "Ocultar archivos ocultos" : "Mostrar archivos ocultos"
-          }
+          title={showHidden ? t("toolbar.hideHiddenFiles") : t("toolbar.showHiddenFiles")}
         >
           {showHidden ? (
             <Eye className="h-4 w-4" />
@@ -337,7 +338,7 @@ export function Toolbar() {
           size="icon"
           className="h-8 w-8"
           onClick={() => setViewMode(viewMode === "list" ? "grid" : "list")}
-          title={viewMode === "list" ? "Vista cuadrícula" : "Vista lista"}
+          title={viewMode === "list" ? t("toolbar.gridView") : t("toolbar.listView")}
         >
           {viewMode === "list" ? (
             <LayoutGrid className="h-4 w-4" />
@@ -351,7 +352,7 @@ export function Toolbar() {
           size="icon"
           className="h-8 w-8"
           onClick={onOpenSettings}
-          title="Configuración"
+          title={t("toolbar.settings")}
         >
           <Settings className="h-4 w-4" />
         </Button>
@@ -363,7 +364,7 @@ export function Toolbar() {
           onClick={onOpenSearch}
         >
           <Search className="h-3.5 w-3.5" />
-          <span className="hidden md:inline">Buscar archivos</span>
+          <span className="hidden md:inline">{t("toolbar.searchFiles")}</span>
           <kbd className="ml-1 hidden rounded border border-border/60 bg-muted px-1.5 py-0.5 font-mono text-[10px] sm:inline">
             ⌘K
           </kbd>

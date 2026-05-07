@@ -1,5 +1,7 @@
 import { useCallback, useEffect, useState } from "react"
 import { createPortal } from "react-dom"
+import { useTranslation } from "react-i18next"
+import i18n from "@/shared/i18n/i18n"
 import {
   X,
   Folder,
@@ -26,7 +28,8 @@ function formatSize(bytes: number): string {
 }
 
 function formatDate(secs: number): string {
-  return new Date(secs * 1000).toLocaleString("es-AR", {
+  const locale = i18n.language === "es" ? "es-AR" : "en-US"
+  return new Date(secs * 1000).toLocaleString(locale, {
     dateStyle: "short",
     timeStyle: "short",
   })
@@ -39,6 +42,7 @@ interface Props {
 }
 
 export function TrashPanel({ onClose, restorePath, onRestored }: Props) {
+  const { t } = useTranslation()
   const [, setTrashDir] = useState<string | null>(null)
   const [entries, setEntries] = useState<TrashEntry[]>([])
   const [loading, setLoading] = useState(true)
@@ -127,7 +131,7 @@ export function TrashPanel({ onClose, restorePath, onRestored }: Props) {
         {/* Header */}
         <div className="flex shrink-0 items-center gap-2 border-b border-border/60 px-4 py-3">
           <Trash2 className="h-4 w-4 shrink-0 text-muted-foreground" />
-          <span className="flex-1 text-sm font-medium">Papelera</span>
+          <span className="flex-1 text-sm font-medium">{t("trash.title")}</span>
           <button
             onClick={onClose}
             className="rounded p-1 text-muted-foreground hover:bg-muted"
@@ -141,7 +145,7 @@ export function TrashPanel({ onClose, restorePath, onRestored }: Props) {
           {loading && (
             <div className="flex h-full items-center justify-center gap-2 text-sm text-muted-foreground">
               <Loader2 className="h-4 w-4 animate-spin" />
-              Cargando…
+              {t("trash.loading")}
             </div>
           )}
           {error &&
@@ -150,12 +154,9 @@ export function TrashPanel({ onClose, restorePath, onRestored }: Props) {
               <div className="flex h-full flex-col items-center justify-center gap-4 px-8 text-center">
                 <ShieldAlert className="h-10 w-10 text-amber-500" />
                 <div>
-                  <p className="text-sm font-medium">
-                    Se necesita Acceso Total al Disco
-                  </p>
+                  <p className="text-sm font-medium">{t("trash.permissionsTitle")}</p>
                   <p className="mt-1 text-xs text-muted-foreground">
-                    macOS protege la Papelera. Otorga permiso en Preferencias
-                    del Sistema, luego <strong>reinicia Kenafold</strong>.
+                    {t("trash.permissionsDesc")}
                   </p>
                 </div>
                 <div className="flex gap-2">
@@ -168,11 +169,11 @@ export function TrashPanel({ onClose, restorePath, onRestored }: Props) {
                     }
                   >
                     <ExternalLink className="mr-1.5 h-3.5 w-3.5" />
-                    Abrir Preferencias
+                    {t("trash.openPreferences")}
                   </Button>
                   <Button variant="ghost" size="sm" onClick={load}>
                     <RefreshCw className="mr-1.5 h-3.5 w-3.5" />
-                    Reintentar
+                    {t("trash.retry")}
                   </Button>
                 </div>
               </div>
@@ -184,7 +185,7 @@ export function TrashPanel({ onClose, restorePath, onRestored }: Props) {
             ))}
           {!loading && !error && entries.length === 0 && (
             <div className="flex h-full items-center justify-center text-sm text-muted-foreground">
-              La papelera está vacía
+              {t("trash.empty")}
             </div>
           )}
           {!loading &&
@@ -201,7 +202,7 @@ export function TrashPanel({ onClose, restorePath, onRestored }: Props) {
                 <div className="min-w-0 flex-1">
                   <p className="truncate text-sm">{entry.name}</p>
                   <p className="text-xs text-muted-foreground">
-                    {entry.is_dir ? "Carpeta" : formatSize(entry.size)} ·{" "}
+                    {entry.is_dir ? t("trash.folder") : formatSize(entry.size)} ·{" "}
                     {formatDate(entry.modified)}
                   </p>
                 </div>
@@ -210,20 +211,20 @@ export function TrashPanel({ onClose, restorePath, onRestored }: Props) {
                     disabled={busy === entry.name}
                     onClick={() => restore(entry)}
                     className="flex items-center gap-1 rounded px-2 py-1 text-xs text-muted-foreground hover:bg-accent hover:text-foreground disabled:opacity-50"
-                    title={`Restaurar en: ${restorePath}`}
+                    title={`${t("trash.restoreHere")}: ${restorePath}`}
                   >
                     {busy === entry.name ? (
                       <Loader2 className="h-3 w-3 animate-spin" />
                     ) : (
                       <RotateCcw className="h-3 w-3" />
                     )}
-                    Restaurar aquí
+                    {t("trash.restoreHere")}
                   </button>
                   <button
                     disabled={busy === entry.name}
                     onClick={() => deleteItem(entry)}
                     className="flex items-center gap-1 rounded px-2 py-1 text-xs text-muted-foreground hover:bg-destructive/10 hover:text-destructive disabled:opacity-50"
-                    title="Eliminar definitivamente"
+                    title={t("trash.deleteForever")}
                   >
                     <Trash2 className="h-3 w-3" />
                   </button>
@@ -235,20 +236,20 @@ export function TrashPanel({ onClose, restorePath, onRestored }: Props) {
         {/* Footer */}
         <div className="flex shrink-0 items-center justify-between border-t border-border/60 px-4 py-2">
           <span className="text-xs text-muted-foreground">
-            {entries.length} elemento{entries.length !== 1 ? "s" : ""}
+            {t("trash.item", { count: entries.length })}
           </span>
           {confirmEmpty ? (
             <div className="flex items-center gap-2">
-              <span className="text-xs text-muted-foreground">¿Seguro?</span>
+              <span className="text-xs text-muted-foreground">{t("trash.confirmEmpty")}</span>
               <Button variant="destructive" size="sm" onClick={emptyTrash}>
-                Vaciar
+                {t("trash.emptyAction")}
               </Button>
               <Button
                 variant="ghost"
                 size="sm"
                 onClick={() => setConfirmEmpty(false)}
               >
-                Cancelar
+                {t("trash.cancel")}
               </Button>
             </div>
           ) : (
@@ -259,7 +260,7 @@ export function TrashPanel({ onClose, restorePath, onRestored }: Props) {
               disabled={entries.length === 0}
               onClick={() => setConfirmEmpty(true)}
             >
-              Vaciar papelera
+              {t("trash.emptyTrash")}
             </Button>
           )}
         </div>

@@ -268,6 +268,8 @@ export default function App() {
         terminalId={settings.terminalId}
         setTerminalId={settings.setTerminalId}
         refreshTerminals={settings.refreshTerminals}
+        language={settings.language}
+        setLanguage={settings.setLanguage}
       />
 
       {trashOpen && (

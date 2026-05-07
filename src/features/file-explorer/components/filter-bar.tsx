@@ -1,5 +1,6 @@
 import { useRef, useState, useEffect } from "react"
 import { createPortal } from "react-dom"
+import { useTranslation } from "react-i18next"
 import { Search, HardDrive, Diff, MoreHorizontal, Trash2 } from "lucide-react"
 import { useFileExplorer } from "../state/explorer-context"
 import { DiskUsagePanel } from "./disk-usage-panel"
@@ -7,6 +8,7 @@ import { FolderComparatorPanel } from "./folder-comparator-panel"
 import { TrashPanel } from "./trash-panel"
 
 export function FilterBar() {
+  const { t } = useTranslation()
   const { filterQuery, setFilterQuery, filterRef, entries, path, reload } = useFileExplorer()
   const [diskUsageOpen, setDiskUsageOpen] = useState(false)
   const [comparatorOpen, setComparatorOpen] = useState(false)
@@ -37,7 +39,7 @@ export function FilterBar() {
           ref={filterRef}
           value={filterQuery}
           onChange={(e) => setFilterQuery(e.target.value)}
-          placeholder="Filtrar... (/)"
+          placeholder={t("filterBar.placeholder")}
           autoComplete="off"
           autoCorrect="off"
           autoCapitalize="off"
@@ -56,7 +58,7 @@ export function FilterBar() {
           ref={btnRef}
           onClick={openMenu}
           className="flex h-6 w-6 items-center justify-center rounded text-muted-foreground/60 hover:bg-muted hover:text-foreground"
-          title="Herramientas"
+          title={t("filterBar.tools")}
         >
           <MoreHorizontal className="h-3.5 w-3.5" />
         </button>
@@ -74,21 +76,21 @@ export function FilterBar() {
               onClick={() => { setMenuPos(null); setDiskUsageOpen(true) }}
             >
               <HardDrive className="h-3.5 w-3.5 text-muted-foreground" />
-              Espacio en disco
+              {t("filterBar.diskSpace")}
             </button>
             <button
               className="flex w-full items-center gap-2.5 px-3 py-1.5 text-left text-sm hover:bg-accent"
               onClick={() => { setMenuPos(null); setComparatorOpen(true) }}
             >
               <Diff className="h-3.5 w-3.5 text-muted-foreground" />
-              Comparar carpetas
+              {t("filterBar.compareFolders")}
             </button>
             <button
               className="flex w-full items-center gap-2.5 px-3 py-1.5 text-left text-sm hover:bg-accent"
               onClick={() => { setMenuPos(null); setTrashOpen(true) }}
             >
               <Trash2 className="h-3.5 w-3.5 text-muted-foreground" />
-              Papelera
+              {t("filterBar.trash")}
             </button>
           </div>
         </>,

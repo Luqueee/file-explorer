@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react"
 import { createPortal } from "react-dom"
+import { useTranslation } from "react-i18next"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import type { FileEntry } from "@/features/filesystem/domain/file-entry"
@@ -22,7 +23,7 @@ function stemAndExt(name: string): [string, string] {
 
 function applyPattern(pattern: string, entry: FileEntry, index: number): string {
   const [stem, ext] = stemAndExt(entry.name)
-  let result = pattern
+  const result = pattern
     .replaceAll("{n}", String(index + 1))
     .replaceAll("{name}", stem)
     .replaceAll("{ext}", ext ? `.${ext}` : "")
@@ -30,12 +31,7 @@ function applyPattern(pattern: string, entry: FileEntry, index: number): string 
   return result.trim()
 }
 
-function applyFindReplace(
-  find: string,
-  replace: string,
-  isRegex: boolean,
-  entry: FileEntry
-): string {
+function applyFindReplace(find: string, replace: string, isRegex: boolean, entry: FileEntry): string {
   if (!find) return entry.name
   try {
     if (isRegex) return entry.name.replace(new RegExp(find, "g"), replace)
@@ -46,6 +42,7 @@ function applyFindReplace(
 }
 
 export function BulkRenameModal({ entries, onCommit, onCancel }: Props) {
+  const { t } = useTranslation()
   const [mode, setMode] = useState<Mode>("pattern")
   const [pattern, setPattern] = useState("{name}{ext}")
   const [find, setFind] = useState("")
@@ -81,6 +78,7 @@ export function BulkRenameModal({ entries, onCommit, onCancel }: Props) {
   const hasEmpty = newNames.some((n) => !n)
   const hasChanges = previews.some((p) => p.newName !== p.entry.name)
   const canApply = !hasDuplicates && !hasEmpty && hasChanges
+  const changedCount = previews.filter((p) => p.newName !== p.entry.name).length
 
   const handleApply = () => {
     const renames = previews
@@ -89,31 +87,36 @@ export function BulkRenameModal({ entries, onCommit, onCancel }: Props) {
     onCommit(renames)
   }
 
+  const tokens: Array<[string, string]> = [
+    ["{name}", t("bulkRename.tokenStem")],
+    ["{ext}", t("bulkRename.tokenExt")],
+    ["{n}", t("bulkRename.tokenIndex")],
+    ["{date}", t("bulkRename.tokenDate")],
+  ]
+
   return createPortal(
     <div
       className="fixed inset-0 z-50 flex items-center justify-center bg-black/50"
-      onClick={(e) => {
-        if (e.target === e.currentTarget) onCancel()
-      }}
+      onClick={(e) => { if (e.target === e.currentTarget) onCancel() }}
     >
       <div className="flex w-[560px] max-w-[95vw] flex-col rounded-lg border border-border bg-popover shadow-xl">
         {/* Header */}
         <div className="flex items-center justify-between border-b border-border px-4 py-3">
           <span className="text-sm font-medium">
-            Renombrar {entries.length} archivo{entries.length !== 1 ? "s" : ""}
+            {t("bulkRename.title", { count: entries.length })}
           </span>
           <div className="flex gap-1 rounded-md bg-muted p-0.5 text-xs">
             <button
               className={`rounded px-2.5 py-1 transition-colors ${mode === "pattern" ? "bg-background shadow-sm" : "text-muted-foreground hover:text-foreground"}`}
               onClick={() => setMode("pattern")}
             >
-              Patrón
+              {t("bulkRename.patternMode")}
             </button>
             <button
               className={`rounded px-2.5 py-1 transition-colors ${mode === "find-replace" ? "bg-background shadow-sm" : "text-muted-foreground hover:text-foreground"}`}
               onClick={() => setMode("find-replace")}
             >
-              Buscar / Reemplazar
+              {t("bulkRename.findReplaceMode")}
             </button>
           </div>
         </div>
@@ -130,13 +133,8 @@ export function BulkRenameModal({ entries, onCommit, onCancel }: Props) {
                 className="h-8 font-mono text-sm"
               />
               <p className="text-xs text-muted-foreground">
-                Tokens:{" "}
-                {[
-                  ["{name}", "nombre sin extensión"],
-                  ["{ext}", ".extensión"],
-                  ["{n}", "índice (1, 2, 3…)"],
-                  ["{date}", "fecha AAAA-MM-DD"],
-                ].map(([token, desc]) => (
+                {t("bulkRename.tokens")}{" "}
+                {tokens.map(([token, desc]) => (
                   <span key={token}>
                     <code className="rounded bg-muted px-1">{token}</code>{" "}
                     {desc}
@@ -152,7 +150,7 @@ export function BulkRenameModal({ entries, onCommit, onCancel }: Props) {
                   ref={inputRef}
                   value={find}
                   onChange={(e) => setFind(e.target.value)}
-                  placeholder="Buscar…"
+                  placeholder={t("bulkRename.searchPlaceholder")}
                   className="h-8 pr-16 font-mono text-sm"
                 />
                 <button
@@ -165,7 +163,7 @@ export function BulkRenameModal({ entries, onCommit, onCancel }: Props) {
               <Input
                 value={replace}
                 onChange={(e) => setReplace(e.target.value)}
-                placeholder="Reemplazar con…"
+                placeholder={t("bulkRename.replacePlaceholder")}
                 className="h-8 flex-1 font-mono text-sm"
               />
             </div>
@@ -183,26 +181,19 @@ export function BulkRenameModal({ entries, onCommit, onCancel }: Props) {
                 key={entry.path}
                 className="flex items-center gap-2 px-4 py-1.5 text-xs odd:bg-muted/30"
               >
-                <span className="w-[45%] truncate text-muted-foreground">
-                  {entry.name}
-                </span>
+                <span className="w-[45%] truncate text-muted-foreground">{entry.name}</span>
                 <span className="shrink-0 text-muted-foreground">→</span>
                 <span
                   className={`flex-1 truncate font-medium ${
-                    isEmpty
-                      ? "text-destructive"
-                      : isDup
-                        ? "text-amber-500"
-                        : unchanged
-                          ? "text-muted-foreground"
-                          : "text-foreground"
+                    isEmpty ? "text-destructive"
+                      : isDup ? "text-amber-500"
+                      : unchanged ? "text-muted-foreground"
+                      : "text-foreground"
                   }`}
                 >
-                  {isEmpty ? "(vacío)" : newName}
+                  {isEmpty ? t("bulkRename.empty") : newName}
                 </span>
-                {isDup && (
-                  <span className="shrink-0 text-xs text-amber-500">dup</span>
-                )}
+                {isDup && <span className="shrink-0 text-xs text-amber-500">dup</span>}
               </div>
             )
           })}
@@ -211,24 +202,22 @@ export function BulkRenameModal({ entries, onCommit, onCancel }: Props) {
         {/* Errors */}
         {(hasDuplicates || hasEmpty) && (
           <p className="px-4 py-2 text-xs text-destructive">
-            {hasEmpty && "Algunos nombres quedarían vacíos. "}
-            {hasDuplicates && "Hay nombres duplicados en el resultado."}
+            {hasEmpty && t("bulkRename.errorEmpty")}
+            {hasDuplicates && t("bulkRename.errorDuplicates")}
           </p>
         )}
 
         {/* Footer */}
         <div className="flex items-center justify-between px-4 py-3">
           <span className="text-xs text-muted-foreground">
-            {hasChanges
-              ? `${previews.filter((p) => p.newName !== p.entry.name).length} archivo${previews.filter((p) => p.newName !== p.entry.name).length !== 1 ? "s" : ""} cambia${previews.filter((p) => p.newName !== p.entry.name).length !== 1 ? "n" : ""}`
-              : "Sin cambios"}
+            {hasChanges ? t("bulkRename.changesCount", { count: changedCount }) : t("bulkRename.noChanges")}
           </span>
           <div className="flex gap-2">
             <Button variant="ghost" size="sm" onClick={onCancel}>
-              Cancelar
+              {t("bulkRename.cancel")}
             </Button>
             <Button size="sm" disabled={!canApply} onClick={handleApply}>
-              Aplicar
+              {t("bulkRename.apply")}
             </Button>
           </div>
         </div>

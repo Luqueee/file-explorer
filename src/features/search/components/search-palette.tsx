@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react"
+import { useTranslation } from "react-i18next"
 import { Search, FileText, Loader2, CornerDownLeft, FolderOpen, Bookmark, BookmarkCheck } from "lucide-react"
 import { useGrep, useSearch, useSearchIndex } from "../api/use-search"
 import { FileIcon } from "@/features/file-explorer/components/file-icon"
@@ -33,28 +34,17 @@ export function SearchPalette({
   onUnsave,
   isSaved,
 }: Props) {
+  const { t } = useTranslation()
   const [query, setQuery] = useState("")
   const [selected, setSelected] = useState(0)
   const [mode, setMode] = useState<Mode>("name")
   const listRef = useRef<HTMLDivElement | null>(null)
 
-  const { indexing, size: indexSize } = useSearchIndex(
-    root,
-    open && mode === "name"
-  )
-  const { results: nameResults, loading: nameLoading } = useSearch(
-    root,
-    query,
-    open && mode === "name"
-  )
-  const { results: grepResults, loading: grepLoading } = useGrep(
-    root,
-    query,
-    open && mode === "content"
-  )
+  const { indexing, size: indexSize } = useSearchIndex(root, open && mode === "name")
+  const { results: nameResults, loading: nameLoading } = useSearch(root, query, open && mode === "name")
+  const { results: grepResults, loading: grepLoading } = useGrep(root, query, open && mode === "content")
 
-  const itemCount =
-    mode === "name" ? nameResults.length : grepResults.length
+  const itemCount = mode === "name" ? nameResults.length : grepResults.length
   const loading = mode === "name" ? nameLoading : grepLoading
 
   useEffect(() => {
@@ -131,9 +121,9 @@ export function SearchPalette({
   const placeholder =
     mode === "name"
       ? indexing
-        ? "Indexando..."
-        : "Buscar archivos por nombre..."
-      : "Buscar texto dentro de archivos..."
+        ? t("search.indexing")
+        : t("search.placeholderName")
+      : t("search.placeholderContent")
 
   return (
     <div
@@ -167,12 +157,10 @@ export function SearchPalette({
           {query.trim() && onSave && onUnsave && isSaved && (
             <button
               onClick={() =>
-                isSaved(query, mode)
-                  ? onUnsave(query, mode)
-                  : onSave(query, mode)
+                isSaved(query, mode) ? onUnsave(query, mode) : onSave(query, mode)
               }
               className="shrink-0 rounded p-1 text-muted-foreground hover:bg-muted hover:text-foreground"
-              title={isSaved(query, mode) ? "Quitar de guardados" : "Guardar búsqueda"}
+              title={isSaved(query, mode) ? t("search.unsave") : t("search.save")}
             >
               {isSaved(query, mode)
                 ? <BookmarkCheck className="h-4 w-4 text-primary" />
@@ -190,23 +178,23 @@ export function SearchPalette({
           {!query && mode === "name" && !indexing && (
             <div className="px-4 py-10 text-center text-sm text-muted-foreground">
               {indexSize != null
-                ? `${indexSize.toLocaleString()} archivos indexados. Escribe para buscar.`
-                : `Escribe para buscar archivos en ${root}`}
+                ? t("search.indexedFiles", { count: indexSize })
+                : t("search.typeToSearch", { root })}
             </div>
           )}
           {!query && mode === "name" && indexing && (
             <div className="px-4 py-10 text-center text-sm text-muted-foreground">
-              Indexando {root}...
+              {t("search.indexingDir", { root })}
             </div>
           )}
           {!query && mode === "content" && (
             <div className="px-4 py-10 text-center text-sm text-muted-foreground">
-              Escribe texto para buscar dentro de archivos en {root}
+              {t("search.typeToSearchContent", { root })}
             </div>
           )}
           {query && !loading && itemCount === 0 && (
             <div className="px-4 py-10 text-center text-sm text-muted-foreground">
-              Sin resultados
+              {t("search.noResults")}
             </div>
           )}
 
@@ -222,16 +210,10 @@ export function SearchPalette({
                   onClick={() => handleSelectName(r)}
                   onMouseEnter={() => setSelected(i)}
                   className={`group flex w-full cursor-pointer items-center gap-3 px-4 py-2 text-left text-sm ${
-                    i === selected
-                      ? "bg-accent text-accent-foreground"
-                      : "text-foreground"
+                    i === selected ? "bg-accent text-accent-foreground" : "text-foreground"
                   }`}
                 >
-                  <FileIcon
-                    name={r.name}
-                    isDir={r.is_dir}
-                    extension={r.extension}
-                  />
+                  <FileIcon name={r.name} isDir={r.is_dir} extension={r.extension} />
                   <div className="flex min-w-0 flex-1 flex-col">
                     <span className="truncate font-medium">{r.name}</span>
                     <span className="truncate text-[11px] text-muted-foreground">
@@ -240,11 +222,11 @@ export function SearchPalette({
                   </div>
                   <div className="ml-2 flex shrink-0 items-center gap-2">
                     <div className="flex flex-col items-end text-[11px] text-muted-foreground tabular-nums">
-                      <span>{r.is_dir ? "carpeta" : formatSize(r.size)}</span>
+                      <span>{r.is_dir ? t("search.folder") : formatSize(r.size)}</span>
                       <span>{formatDate(r.modified)}</span>
                     </div>
                     <button
-                      title="Ir a la carpeta"
+                      title={t("filterBar.compareFolders")}
                       onClick={(e) => { e.stopPropagation(); handleGoToFolder(parent) }}
                       className="invisible rounded p-1 text-muted-foreground hover:bg-background/20 hover:text-foreground group-hover:visible"
                     >
@@ -274,25 +256,21 @@ export function SearchPalette({
 
         {itemCount > 0 && (
           <div className="flex items-center justify-between border-t border-border/60 bg-muted/30 px-4 py-2 text-[11px] text-muted-foreground">
-            <span>{itemCount} resultados</span>
+            <span>{t("search.results", { count: itemCount })}</span>
             <div className="flex items-center gap-3">
               <span className="flex items-center gap-1">
-                <kbd className="rounded border border-border/60 bg-background px-1 py-0.5 font-mono">
-                  ⌘F
-                </kbd>
-                cambiar modo
+                <kbd className="rounded border border-border/60 bg-background px-1 py-0.5 font-mono">⌘F</kbd>
+                {t("search.switchMode")}
               </span>
               <span className="flex items-center gap-1">
-                <kbd className="rounded border border-border/60 bg-background px-1 py-0.5 font-mono">
-                  ↑↓
-                </kbd>
-                navegar
+                <kbd className="rounded border border-border/60 bg-background px-1 py-0.5 font-mono">↑↓</kbd>
+                {t("search.navigate")}
               </span>
               <span className="flex items-center gap-1">
                 <kbd className="rounded border border-border/60 bg-background px-1 py-0.5 font-mono">
                   <CornerDownLeft className="h-3 w-3" />
                 </kbd>
-                abrir
+                {t("search.open")}
               </span>
             </div>
           </div>
@@ -302,59 +280,35 @@ export function SearchPalette({
   )
 }
 
-function ModeTabs({
-  mode,
-  setMode,
-}: {
-  mode: Mode
-  setMode: (m: Mode) => void
-}) {
+function ModeTabs({ mode, setMode }: { mode: Mode; setMode: (m: Mode) => void }) {
+  const { t } = useTranslation()
   return (
     <div className="flex shrink-0 overflow-hidden rounded border border-border/60 text-[11px]">
       <button
         onClick={() => setMode("name")}
-        className={`px-2 py-0.5 ${
-          mode === "name"
-            ? "bg-accent text-accent-foreground"
-            : "text-muted-foreground hover:text-foreground"
-        }`}
+        className={`px-2 py-0.5 ${mode === "name" ? "bg-accent text-accent-foreground" : "text-muted-foreground hover:text-foreground"}`}
       >
-        Nombre
+        {t("search.tabName")}
       </button>
       <button
         onClick={() => setMode("content")}
-        className={`px-2 py-0.5 ${
-          mode === "content"
-            ? "bg-accent text-accent-foreground"
-            : "text-muted-foreground hover:text-foreground"
-        }`}
+        className={`px-2 py-0.5 ${mode === "content" ? "bg-accent text-accent-foreground" : "text-muted-foreground hover:text-foreground"}`}
       >
-        Contenido
+        {t("search.tabContent")}
       </button>
     </div>
   )
 }
 
 function GrepRow({
-  hit,
-  index,
-  selected,
-  onSelect,
-  onHover,
-  onGoToFolder,
+  hit, index, selected, onSelect, onHover, onGoToFolder,
 }: {
-  hit: GrepHit
-  index: number
-  selected: boolean
-  onSelect: () => void
-  onHover: () => void
-  onGoToFolder: () => void
+  hit: GrepHit; index: number; selected: boolean
+  onSelect: () => void; onHover: () => void; onGoToFolder: () => void
 }) {
+  const { t } = useTranslation()
   const name = useMemo(() => hit.path.split("/").at(-1) ?? hit.path, [hit.path])
-  const parent = useMemo(
-    () => hit.path.slice(0, hit.path.length - name.length - 1),
-    [hit.path, name]
-  )
+  const parent = useMemo(() => hit.path.slice(0, hit.path.length - name.length - 1), [hit.path, name])
   const before = hit.line.slice(0, hit.match_start)
   const match = hit.line.slice(hit.match_start, hit.match_end)
   const after = hit.line.slice(hit.match_end)
@@ -375,7 +329,7 @@ function GrepRow({
         <span className="truncate">{parent || "/"}</span>
         <span className="ml-auto shrink-0 tabular-nums">:{hit.line_number}</span>
         <button
-          title="Ir a la carpeta"
+          title={t("filterBar.compareFolders")}
           onClick={(e) => { e.stopPropagation(); onGoToFolder() }}
           className="invisible rounded p-1 hover:bg-background/20 hover:text-foreground group-hover:visible"
         >

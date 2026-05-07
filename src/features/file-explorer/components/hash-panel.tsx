@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react"
 import { createPortal } from "react-dom"
+import { useTranslation } from "react-i18next"
 import { X, Copy, Check, Loader2, FileDigit } from "lucide-react"
 import { fsGateway } from "@/features/filesystem/infra/fs.gateway"
 import type { FileEntry } from "@/features/filesystem/domain/file-entry"
@@ -24,6 +25,7 @@ function formatSize(bytes: number): string {
 }
 
 function CopyButton({ value }: { value: string }) {
+  const { t } = useTranslation()
   const [copied, setCopied] = useState(false)
   const copy = async () => {
     await navigator.clipboard.writeText(value)
@@ -34,7 +36,7 @@ function CopyButton({ value }: { value: string }) {
     <button
       onClick={copy}
       className="ml-2 shrink-0 rounded p-1 text-muted-foreground hover:bg-muted hover:text-foreground"
-      title="Copiar"
+      title={t("hash.copy")}
     >
       {copied ? <Check className="h-3.5 w-3.5 text-green-500" /> : <Copy className="h-3.5 w-3.5" />}
     </button>
@@ -56,14 +58,12 @@ function HashRow({ label, value }: { label: string; value: string }) {
 }
 
 export function HashPanel({ entry, onClose }: Props) {
+  const { t } = useTranslation()
   const [hashes, setHashes] = useState<Hashes | null>(null)
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
-    fsGateway
-      .computeHashes(entry.path)
-      .then(setHashes)
-      .catch((e) => setError(String(e)))
+    fsGateway.computeHashes(entry.path).then(setHashes).catch((e) => setError(String(e)))
   }, [entry.path])
 
   useEffect(() => {
@@ -80,13 +80,8 @@ export function HashPanel({ entry, onClose }: Props) {
       <div className="flex w-[480px] max-w-[95vw] flex-col overflow-hidden rounded-xl border border-border bg-popover shadow-2xl">
         <div className="flex items-center gap-2 border-b border-border/60 px-4 py-3">
           <FileDigit className="h-4 w-4 shrink-0 text-muted-foreground" />
-          <span className="flex-1 truncate text-sm font-medium" title={entry.path}>
-            {entry.name}
-          </span>
-          <button
-            onClick={onClose}
-            className="rounded p-1 text-muted-foreground hover:bg-muted"
-          >
+          <span className="flex-1 truncate text-sm font-medium" title={entry.path}>{entry.name}</span>
+          <button onClick={onClose} className="rounded p-1 text-muted-foreground hover:bg-muted">
             <X className="h-4 w-4" />
           </button>
         </div>
@@ -95,7 +90,7 @@ export function HashPanel({ entry, onClose }: Props) {
           {!hashes && !error && (
             <div className="flex h-32 items-center justify-center gap-2 text-sm text-muted-foreground">
               <Loader2 className="h-4 w-4 animate-spin" />
-              Calculando hashes…
+              {t("hash.computing")}
             </div>
           )}
           {error && (
